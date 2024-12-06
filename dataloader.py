@@ -15,6 +15,8 @@ import requests
 import tokenizers
 import torch
 import transformers
+from datasets import load_dataset
+from ..smiles_tokenizer import SMILESTokenizer
 
 import utils
 
@@ -157,6 +159,54 @@ class Text8Tokenizer(transformers.PreTrainedTokenizer):
   def get_vocab(self) -> typing.Dict[str, int]:
     return self._vocab_str_to_int
 
+
+def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
+    # Load the dataset
+    dataset = load_dataset("liupf/chEBI-20-MM")
+    bert_model = transformers.AutoModel.from_pretrained('bert-base-uncased')
+
+    smiles_tokenizer = SMILESTokenizer()
+    
+    # Process data into required format
+    def process_examples(examples):
+        # Tokenize SMILES with custom tokenizer
+        smiles_encodings = smiles_tokenizer(
+            examples['SMILES'],
+            padding='max_length',
+            truncation=True,
+            max_length=config.model.smiles_length,  # New config parameter needed
+            return_attention_mask=True
+        )
+        
+        # Get BERT embeddings for descriptions
+        description_encodings = text_tokenizer(
+            examples['description'],
+            padding='max_length', 
+            truncation=True,
+            max_length=config.model.text_length,  # New config parameter needed
+            return_attention_mask=True,
+            return_tensors='pt'
+        )
+        
+        # Get BERT embeddings
+        with torch.no_grad():
+            text_embeddings = bert_model(**description_encodings).last_hidden_state ## TODO add bert model from hf 
+        
+        return {
+            'input_ids': smiles_encodings['input_ids'],
+            'attention_mask': smiles_encodings['attention_mask'],
+            'text_embeddings': text_embeddings,
+            'text_attention_mask': description_encodings['attention_mask']
+        }
+
+    # Process and create dataset
+    processed_dataset = dataset[mode].map(
+        process_examples,
+        batched=True,
+        remove_columns=dataset[mode].column_names
+    )
+    
+    return processed_dataset.with_format('torch')
 
 def get_lambada_test_dataset():
     url = "https://openaipublic.blob.core.windows.net/gpt-2/data/lambada_test.jsonl"
@@ -370,6 +420,12 @@ def get_dataset(
       'ag_news',
       cache_dir=cache_dir,
       streaming=streaming)
+  elif dataset_name == 'chebi':
+    dataset = get_chebi_dataset(
+        cache_dir=cache_dir,
+        tokenizer=tokenizer,
+        mode=mode
+    )
   else:
     dataset = datasets.load_dataset(
       dataset_name,

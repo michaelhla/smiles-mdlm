@@ -3,6 +3,7 @@ import math
 import os
 import typing
 from dataclasses import dataclass
+from ..smiles_tokenizer import SMILESTokenizer
 
 import hydra.utils
 import lightning as L
@@ -73,6 +74,25 @@ class Diffusion(L.LightningModule):
     super().__init__()
     self.save_hyperparameters()
     self.config = config
+
+    # Initialize both tokenizers
+    self.smiles_tokenizer = SMILESTokenizer()
+    self.text_tokenizer = transformers.AutoTokenizer.from_pretrained('bert-base-uncased')
+    self.bert_model = transformers.AutoModel.from_pretrained('bert-base-uncased')
+    
+    # Freeze BERT
+    for param in self.bert_model.parameters():
+        param.requires_grad = False
+        
+    self.vocab_size = self.smiles_tokenizer.vocab_size
+    
+    # Initialize DiT with text conditioning
+    if self.config.backbone == 'dit':
+        self.backbone = models.dit.DIT(
+            self.config, 
+            vocab_size=self.vocab_size,
+            text_embed_dim=768  # BERT hidden size
+        )
 
     self.tokenizer = tokenizer
     self.vocab_size = self.tokenizer.vocab_size
