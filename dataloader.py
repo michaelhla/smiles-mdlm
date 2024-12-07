@@ -16,7 +16,7 @@ import tokenizers
 import torch
 import transformers
 from datasets import load_dataset
-from ..smiles_tokenizer import SMILESTokenizer
+from smiles_tokenizer import SMILESTokenizer
 
 import utils
 

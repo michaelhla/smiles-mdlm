@@ -4,6 +4,8 @@
 #SBATCH --gpus=1
 #SBATCH --mem=16GB  # Reduced memory requirement due to smaller model
 
+export HYDRA_FULL_ERROR=1
+
 python main.py \
   model=small_chebi \
   data=chebi \

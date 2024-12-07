@@ -3,7 +3,7 @@ import math
 import os
 import typing
 from dataclasses import dataclass
-from ..smiles_tokenizer import SMILESTokenizer
+from smiles_tokenizer import SMILESTokenizer
 
 import hydra.utils
 import lightning as L
@@ -112,16 +112,16 @@ class Diffusion(L.LightningModule):
     if self.config.backbone == 'dit':
       self.backbone = models.dit.DIT(
         self.config, vocab_size=self.vocab_size)
-    elif self.config.backbone == 'dimamba':
-      self.backbone = models.dimamba.DiMamba(
-        self.config,
-        vocab_size=self.vocab_size,
-        pad_token_id=self.tokenizer.pad_token_id)
-    elif self.config.backbone == 'ar':
-      self.backbone = models.autoregressive.AR(
-        self.config,
-        vocab_size=self.vocab_size,
-        mask_index=self.mask_index)
+    # elif self.config.backbone == 'dimamba':
+    #   self.backbone = models.dimamba.DiMamba(
+    #     self.config,
+    #     vocab_size=self.vocab_size,
+    #     pad_token_id=self.tokenizer.pad_token_id)
+    # elif self.config.backbone == 'ar':
+    #   self.backbone = models.autoregressive.AR(
+    #     self.config,
+    #     vocab_size=self.vocab_size,
+    #     mask_index=self.mask_index)
     elif self.config.backbone == 'hf_dit':
       self.backbone = transformers.AutoModelForMaskedLM.from_pretrained(
         config.eval.checkpoint_path, trust_remote_code=True)
