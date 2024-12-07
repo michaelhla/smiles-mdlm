@@ -329,22 +329,32 @@ class Diffusion(L.LightningModule):
     assert sigma.ndim == 1, sigma.shape
     return sigma
 
-  def forward(self, x, sigma):
-    """Returns log score."""
-    sigma = self._process_sigma(sigma)
-    with torch.cuda.amp.autocast(dtype=torch.float32):
-      logits = self.backbone(x, sigma)
-    
-    if self.parameterization == 'subs':
-      return self._subs_parameterization(logits=logits,
-                                         xt=x)
-    elif self.parameterization == 'sedd':
-      return self._sedd_parameterization(logits=logits,
-                                         xt=x,
-                                         sigma=sigma)
-    elif self.parameterization == 'd3pm':
-      return self._d3pm_parameterization(logits=logits)
-    return logits
+  def forward(self, x, sigma, text_embeddings=None, text_attention_mask=None):
+      """Returns log score.
+      
+      Args:
+          x: Input SMILES tokens tensor
+          sigma: Noise level tensor
+          text_embeddings: Optional BERT embeddings tensor for text conditioning
+          text_attention_mask: Optional attention mask for text embeddings
+      """
+      sigma = self._process_sigma(sigma)
+      with torch.cuda.amp.autocast(dtype=torch.float32):
+          # Pass text conditioning to backbone
+          logits = self.backbone(
+              x, 
+              sigma,
+              text_embeddings=text_embeddings,
+              text_attention_mask=text_attention_mask
+          )
+      
+      if self.parameterization == 'subs':
+          return self._subs_parameterization(logits=logits, xt=x)
+      elif self.parameterization == 'sedd':
+          return self._sedd_parameterization(logits=logits, xt=x, sigma=sigma)
+      elif self.parameterization == 'd3pm':
+          return self._d3pm_parameterization(logits=logits)
+      return logits
 
   def _d3pm_loss(self, model_output, xt, x0, t):
     dt = 1 / self.T
@@ -379,10 +389,19 @@ class Diffusion(L.LightningModule):
 
   def _compute_loss(self, batch, prefix):
     if 'attention_mask' in batch:
-      attention_mask = batch['attention_mask']
+        attention_mask = batch['attention_mask']
     else:
-      attention_mask = None
-    losses = self._loss(batch['input_ids'], attention_mask)
+        attention_mask = None
+        
+    text_embeddings = batch.get('text_embeddings', None)
+    text_attention_mask = batch.get('text_attention_mask', None)
+    
+    losses = self._loss(
+        batch['input_ids'], 
+        attention_mask,
+        text_embeddings=text_embeddings,
+        text_attention_mask=text_attention_mask
+    )
     loss = losses.loss
 
     if prefix == 'train':
@@ -409,11 +428,10 @@ class Diffusion(L.LightningModule):
 
   def training_step(self, batch, batch_idx):
     loss = self._compute_loss(batch, prefix='train')
-    self.log(name='trainer/loss',
-             value=loss.item(),
-             on_step=True,
-             on_epoch=False,
-             sync_dist=True)
+    self.log_dict(self.train_metrics, 
+                  on_step=True, 
+                  on_epoch=True, 
+                  prog_bar=True)
     return loss
 
   def on_validation_epoch_start(self):
@@ -864,27 +882,32 @@ class Diffusion(L.LightningModule):
                           dim=-1,
                           index=x0[:, :, None]).squeeze(-1)
 
-  def _forward_pass_diffusion(self, x0):
+  def _forward_pass_diffusion(self, x0, text_embeddings=None, text_attention_mask=None):
     t = self._sample_t(x0.shape[0], x0.device)
     if self.T > 0:
-      t = (t * self.T).to(torch.int)
-      t = t / self.T
-      # t \in {1/T, 2/T, ..., 1}
-      t += (1 / self.T)
+        t = (t * self.T).to(torch.int)
+        t = t / self.T
+        # t \in {1/T, 2/T, ..., 1}
+        t += (1 / self.T)
 
     if self.change_of_variables:
-      unet_conditioning = t[:, None]
-      f_T = torch.log1p(- torch.exp(- self.noise.sigma_max))
-      f_0 = torch.log1p(- torch.exp(- self.noise.sigma_min))
-      move_chance = torch.exp(f_0 + t * (f_T - f_0))
-      move_chance = move_chance[:, None]
+        unet_conditioning = t[:, None]
+        f_T = torch.log1p(- torch.exp(- self.noise.sigma_max))
+        f_0 = torch.log1p(- torch.exp(- self.noise.sigma_min))
+        move_chance = torch.exp(f_0 + t * (f_T - f_0))
+        move_chance = move_chance[:, None]
     else:
-      sigma, dsigma = self.noise(t)
-      unet_conditioning = sigma[:, None]
-      move_chance = 1 - torch.exp(-sigma[:, None])
+        sigma, dsigma = self.noise(t)
+        unet_conditioning = sigma[:, None]
+        move_chance = 1 - torch.exp(-sigma[:, None])
 
     xt = self.q_xt(x0, move_chance)
-    model_output = self.forward(xt, unet_conditioning)
+    model_output = self.forward(
+        xt, 
+        unet_conditioning,
+        text_embeddings=text_embeddings,
+        text_attention_mask=text_attention_mask
+    )
     utils.print_nans(model_output, 'model_output')
 
     if self.parameterization == 'sedd':
@@ -913,17 +936,21 @@ class Diffusion(L.LightningModule):
     return - log_p_theta * (
       dsigma / torch.expm1(sigma))[:, None]
 
-  def _loss(self, x0, attention_mask):
+  def _loss(self, x0, attention_mask, text_embeddings=None, text_attention_mask=None):
     (input_tokens, output_tokens,
      attention_mask) = self._maybe_sub_sample(
        x0, attention_mask)
 
     if self.parameterization == 'ar':
-      logprobs = self.backbone(input_tokens, None)
-      loss = - logprobs.gather(
-        -1, output_tokens[:, :, None])[:, :, 0]
+        logprobs = self.backbone(input_tokens, None)
+        loss = - logprobs.gather(
+            -1, output_tokens[:, :, None])[:, :, 0]
     else:
-      loss = self._forward_pass_diffusion(input_tokens)
+        loss = self._forward_pass_diffusion(
+            input_tokens,
+            text_embeddings=text_embeddings,
+            text_attention_mask=text_attention_mask
+        )
     
     nlls = loss * attention_mask
     count = attention_mask.sum()

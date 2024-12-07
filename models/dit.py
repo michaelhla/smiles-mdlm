@@ -210,6 +210,120 @@ class LabelEmbedder(nn.Module):
 #                                 Core Model                                    #
 #################################################################################
 
+class DDiTBlockWithCrossAttention(nn.Module):
+    def __init__(self, dim, n_heads, cond_dim, mlp_ratio=4, dropout=0.1):
+        super().__init__()
+        self.n_heads = n_heads
+        
+        # Self attention components
+        self.norm1 = LayerNorm(dim)
+        self.attn_qkv = nn.Linear(dim, 3 * dim, bias=False)
+        self.attn_out = nn.Linear(dim, dim, bias=False)
+        self.dropout1 = nn.Dropout(dropout)
+
+        # Cross attention components
+        self.norm_cross = LayerNorm(dim)
+        self.cross_q = nn.Linear(dim, dim, bias=False)
+        self.cross_k = nn.Linear(dim, dim, bias=False)
+        self.cross_v = nn.Linear(dim, dim, bias=False)
+        self.cross_out = nn.Linear(dim, dim, bias=False)
+        self.dropout_cross = nn.Dropout(dropout)
+
+        # MLP components
+        self.norm2 = LayerNorm(dim)
+        self.mlp = nn.Sequential(
+            nn.Linear(dim, mlp_ratio * dim, bias=True),
+            nn.GELU(approximate='tanh'),
+            nn.Linear(mlp_ratio * dim, dim, bias=True))
+        self.dropout2 = nn.Dropout(dropout)
+
+        # Conditioning components
+        self.adaLN_modulation = nn.Linear(cond_dim, 8 * dim, bias=True)  # 8 = 2 * 4 modulation signals
+        nn.init.zeros_(self.adaLN_modulation.weight)
+        nn.init.zeros_(self.adaLN_modulation.bias)
+
+    def _get_bias_dropout_scale(self):
+        return bias_dropout_add_scale_fused_train if self.training else bias_dropout_add_scale_fused_inference
+
+    def forward(self, x, rotary_cos_sin, c, text_embeddings, text_attention_mask=None):
+        batch_size, seq_len = x.shape[0], x.shape[1]
+        bias_dropout_scale_fn = self._get_bias_dropout_scale()
+
+        # Split modulation signals
+        (shift_msa, scale_msa,
+         shift_cross, scale_cross,
+         shift_mlp, scale_mlp,
+         gate_msa, gate_mlp) = self.adaLN_modulation(c)[:, None].chunk(8, dim=2)
+
+        # Self attention
+        x_skip = x
+        x = modulate_fused(self.norm1(x), shift_msa, scale_msa)
+
+        qkv = self.attn_qkv(x)
+        qkv = rearrange(qkv, 'b s (three h d) -> b s three h d', three=3, h=self.n_heads)
+        
+        with torch.cuda.amp.autocast(enabled=False):
+            cos, sin = rotary_cos_sin
+            qkv = apply_rotary_pos_emb(qkv, cos.to(qkv.dtype), sin.to(qkv.dtype))
+        
+        qkv = rearrange(qkv, 'b s ... -> (b s) ...')
+        
+        if seqlens is None:
+            cu_seqlens = torch.arange(
+                0, (batch_size + 1) * seq_len, step=seq_len,
+                dtype=torch.int32, device=qkv.device)
+        else:
+            cu_seqlens = seqlens.cumsum(-1)
+            
+        x = flash_attn.flash_attn_interface.flash_attn_varlen_qkvpacked_func(
+            qkv, cu_seqlens, seq_len, 0., causal=False)
+        x = rearrange(x, '(b s) h d -> b s (h d)', b=batch_size)
+        x = self.attn_out(x)
+
+        # First residual connection
+        x = bias_dropout_scale_fn(x, None, gate_msa, x_skip, self.dropout1.p)
+
+        # Cross attention
+        x_skip = x
+        x = modulate_fused(self.norm_cross(x), shift_cross, scale_cross)
+        
+        # Compute Q, K, V for cross attention
+        q = self.cross_q(x)
+        k = self.cross_k(text_embeddings)
+        v = self.cross_v(text_embeddings)
+        
+        # Reshape for attention
+        q = rearrange(q, 'b s (h d) -> b h s d', h=self.n_heads)
+        k = rearrange(k, 'b s (h d) -> b h s d', h=self.n_heads)
+        v = rearrange(v, 'b s (h d) -> b h s d', h=self.n_heads)
+
+        # Compute attention scores
+        attn = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(q.size(-1))
+        
+        # Apply attention mask if provided
+        if text_attention_mask is not None:
+            attn = attn.masked_fill(
+                ~text_attention_mask.unsqueeze(1).unsqueeze(2),
+                float('-inf')
+            )
+        
+        attn = F.softmax(attn, dim=-1)
+        attn = self.dropout_cross(attn)
+        
+        # Apply attention to values
+        x = torch.matmul(attn, v)
+        x = rearrange(x, 'b h s d -> b s (h d)')
+        x = self.cross_out(x)
+        
+        # Second residual connection
+        x = x + x_skip
+
+        # MLP block
+        x = bias_dropout_scale_fn(
+            self.mlp(modulate_fused(self.norm2(x), shift_mlp, scale_mlp)),
+            None, gate_mlp, x, self.dropout2.p)
+
+        return x
 
 class DDiTBlock(nn.Module):
   def __init__(self, dim, n_heads, cond_dim, mlp_ratio=4, dropout=0.1):
@@ -320,51 +434,91 @@ class DDitFinalLayer(nn.Module):
     x = self.linear(x)
     return x
 
-
 class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
-  def __init__(self, config, vocab_size: int):
-    super().__init__()
-    if type(config) == dict:
-      config = omegaconf.OmegaConf.create(config)
+    def __init__(self, config, vocab_size: int):
+        super().__init__()
+        if type(config) == dict:
+            config = omegaconf.OmegaConf.create(config)
 
-    self.config = config
-    self.vocab_size = vocab_size
+        self.config = config
+        self.vocab_size = vocab_size
 
-    self.vocab_embed = EmbeddingLayer(config.model.hidden_size,
-                                      vocab_size)
-    self.sigma_map = TimestepEmbedder(config.model.cond_dim)
-    self.rotary_emb = Rotary(
-      config.model.hidden_size // config.model.n_heads)
+        # Standard DiT components
+        self.vocab_embed = EmbeddingLayer(config.model.hidden_size, vocab_size)
+        self.sigma_map = TimestepEmbedder(config.model.cond_dim)
+        self.rotary_emb = Rotary(config.model.hidden_size // config.model.n_heads)
+        
+        # Text embedding projection
+        self.text_proj = nn.Linear(768, config.model.hidden_size)  # 768 is BERT hidden size
+        
+        # Position embeddings for input sequence
+        self.pos_embed = nn.Parameter(torch.zeros(1, config.model.length, config.model.hidden_size))
+        nn.init.normal_(self.pos_embed, std=0.02)
 
-    blocks = []
-    for _ in range(config.model.n_blocks):
-      blocks.append(DDiTBlock(config.model.hidden_size,
-                              config.model.n_heads,
-                              config.model.cond_dim,
-                              dropout=config.model.dropout))
-    self.blocks = nn.ModuleList(blocks)
+        # Transformer blocks with cross attention
+        self.blocks = nn.ModuleList([
+            DDiTBlockWithCrossAttention(
+                dim=config.model.hidden_size,
+                n_heads=config.model.n_heads,
+                cond_dim=config.model.cond_dim,
+                dropout=config.model.dropout
+            ) for _ in range(config.model.n_blocks)
+        ])
 
-    self.output_layer = DDitFinalLayer(
-      config.model.hidden_size,
-      vocab_size,
-      config.model.cond_dim)
-    self.scale_by_sigma = config.model.scale_by_sigma
+        # Output layer
+        self.output_layer = DDitFinalLayer(
+            config.model.hidden_size,
+            vocab_size,
+            config.model.cond_dim
+        )
+        
+        self.scale_by_sigma = config.model.scale_by_sigma
 
-  def _get_bias_dropout_scale(self):
-    if self.training:
-      return bias_dropout_add_scale_fused_train
-    else:
-      return  bias_dropout_add_scale_fused_inference
+    def forward(self, indices, sigma, text_embeddings=None, text_attention_mask=None):
+        """
+        Args:
+            indices: Input token indices [batch_size, seq_len]
+            sigma: Noise level [batch_size]
+            text_embeddings: BERT text embeddings [batch_size, text_seq_len, 768]
+            text_attention_mask: Attention mask for text [batch_size, text_seq_len]
+        """
+        # Input embeddings
+        x = self.vocab_embed(indices)
+        x = x + self.pos_embed[:, :x.size(1), :]
+        
+        # Time conditioning
+        c = F.silu(self.sigma_map(sigma))
+        
+        # Process text embeddings if provided
+        if text_embeddings is not None:
+            # Project text embeddings to model dimension
+            text_proj = self.text_proj(text_embeddings)
+        else:
+            # Use dummy text embeddings if none provided
+            text_proj = torch.zeros(
+                (x.shape[0], 1, x.shape[-1]), 
+                device=x.device, 
+                dtype=x.dtype
+            )
+            text_attention_mask = torch.ones(
+                (x.shape[0], 1), 
+                device=x.device, 
+                dtype=torch.bool
+            )
 
-  def forward(self, indices, sigma):
-    x = self.vocab_embed(indices)
-    c = F.silu(self.sigma_map(sigma))
+        # Get rotary embeddings
+        rotary_cos_sin = self.rotary_emb(x)
 
-    rotary_cos_sin = self.rotary_emb(x)
+        # Process through transformer blocks
+        with torch.cuda.amp.autocast(dtype=torch.bfloat16):
+            for block in self.blocks:
+                x = block(
+                    x, 
+                    rotary_cos_sin, 
+                    c, 
+                    text_proj, 
+                    text_attention_mask
+                )
+            x = self.output_layer(x, c)
 
-    with torch.cuda.amp.autocast(dtype=torch.bfloat16):
-      for i in range(len(self.blocks)):
-        x = self.blocks[i](x, rotary_cos_sin, c, seqlens=None)
-      x = self.output_layer(x, c)
-
-    return x
+        return x
