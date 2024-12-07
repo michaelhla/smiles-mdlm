@@ -1,0 +1,9 @@
+_target_: models.dit.DIT
+hidden_size: 256  # Reduced from 512
+n_heads: 4        # Reduced from 8
+n_blocks: 6       # Reduced from 12
+dropout: 0.2      # Increased from 0.1 for better regularization
+cond_dim: 768     # Keep BERT dimension
+length: 128       # SMILES sequence length
+scale_by_sigma: True
+text_conditioning: True

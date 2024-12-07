@@ -1,7 +1,6 @@
 import math
 import typing
 
-import flash_attn
 import flash_attn.layers.rotary
 import huggingface_hub
 import omegaconf
@@ -105,14 +104,41 @@ class Rotary(torch.nn.Module):
 
 
 def rotate_half(x):
-  x1, x2 = x[..., : x.shape[-1] // 2], x[..., x.shape[-1] // 2 :]
-  return torch.cat((-x2, x1), dim=-1)
+    """Rotates half the hidden dims of the input."""
+    x1 = x[..., :x.shape[-1] // 2]
+    x2 = x[..., x.shape[-1] // 2:]
+    return torch.cat((-x2, x1), dim=-1)
 
 
 def apply_rotary_pos_emb(qkv, cos, sin):
-  cos = cos[0,:,0,0,:cos.shape[-1]//2]
-  sin = sin[0,:,0,0,:sin.shape[-1]//2]
-  return flash_attn.layers.rotary.apply_rotary_emb_qkv_(qkv, cos, sin)
+    # Reshape cos/sin to match the target dimensions
+    cos = cos[0,:,0,0,:cos.shape[-1]//2]  # [seqlen, rotary_dim/2]
+    sin = sin[0,:,0,0,:sin.shape[-1]//2]  # [seqlen, rotary_dim/2]
+    
+    # Split qkv into q, k, v
+    q, k, v = qkv.unbind(dim=2)  # Each has shape [batch, seqlen, nheads, headdim]
+    
+    # Get rotary dim
+    rotary_dim = cos.shape[-1] * 2
+    
+    # Handle q and k, leave v unchanged
+    for t in (q, k):
+        t_rot = t[..., :rotary_dim]  # Get dimensions that will be rotated
+        t_pass = t[..., rotary_dim:]  # Get dimensions that will not be rotated
+        
+        # Apply rotation using euler's formula:
+        # exp(iθ) = cos(θ) + i*sin(θ)
+        # => rotate(x) = x*cos(θ) + rotate_half(x)*sin(θ)
+        t_embed = (t_rot * cos[..., None, :]) + (rotate_half(t_rot) * sin[..., None, :])
+        
+        if t_pass.shape[-1] != 0:
+            t.copy_(torch.cat((t_embed, t_pass), dim=-1))
+        else:
+            t.copy_(t_embed)
+    
+    # Recombine into qkv
+    qkv = torch.stack((q, k, v), dim=2)
+    return qkv
 
 
 # function overload
@@ -266,18 +292,16 @@ class DDiTBlockWithCrossAttention(nn.Module):
             cos, sin = rotary_cos_sin
             qkv = apply_rotary_pos_emb(qkv, cos.to(qkv.dtype), sin.to(qkv.dtype))
         
-        qkv = rearrange(qkv, 'b s ... -> (b s) ...')
+        # Replace flash attention with regular attention
+        qkv = rearrange(qkv, 'b s three h d -> b h s (three d)')
+        q, k, v = qkv.chunk(3, dim=-1)
+
+        # Compute attention scores
+        attn = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(q.size(-1))
+        attn = F.softmax(attn, dim=-1)
+        x = torch.matmul(attn, v)
         
-        if seqlens is None:
-            cu_seqlens = torch.arange(
-                0, (batch_size + 1) * seq_len, step=seq_len,
-                dtype=torch.int32, device=qkv.device)
-        else:
-            cu_seqlens = seqlens.cumsum(-1)
-            
-        x = flash_attn.flash_attn_interface.flash_attn_varlen_qkvpacked_func(
-            qkv, cu_seqlens, seq_len, 0., causal=False)
-        x = rearrange(x, '(b s) h d -> b s (h d)', b=batch_size)
+        x = rearrange(x, 'b h s d -> b s (h d)')
         x = self.attn_out(x)
 
         # First residual connection
@@ -376,18 +400,18 @@ class DDiTBlock(nn.Module):
       cos, sin = rotary_cos_sin
       qkv = apply_rotary_pos_emb(
         qkv, cos.to(qkv.dtype), sin.to(qkv.dtype))
-    qkv = rearrange(qkv, 'b s ... -> (b s) ...')
-    if seqlens is None:
-      cu_seqlens = torch.arange(
-        0, (batch_size + 1) * seq_len, step=seq_len,
-        dtype=torch.int32, device=qkv.device)
-    else:
-      cu_seqlens = seqlens.cumsum(-1)
-    x = flash_attn.flash_attn_interface.flash_attn_varlen_qkvpacked_func(
-      qkv, cu_seqlens, seq_len, 0., causal=False)
-    
-    x = rearrange(x, '(b s) h d -> b s (h d)', b=batch_size)
+      
+      # Replace flash attention with regular attention
+      qkv = rearrange(qkv, 'b s three h d -> b h s (three d)')
+      q, k, v = qkv.chunk(3, dim=-1)
 
+      # Compute attention scores
+      attn = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(q.size(-1))
+      attn = F.softmax(attn, dim=-1)
+      x = torch.matmul(attn, v)
+      
+      x = rearrange(x, 'b h s d -> b s (h d)')
+      
     x = bias_dropout_scale_fn(self.attn_out(x),
                               None,
                               gate_msa,

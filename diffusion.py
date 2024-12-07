@@ -627,17 +627,25 @@ class Diffusion(L.LightningModule):
     return self.mask_index * torch.ones(
       * batch_dims, dtype=torch.int64)
 
-  def _ddpm_caching_update(self, x, t, dt, p_x0=None):
+  def _ddpm_caching_update(self, x, t, dt, text_embeddings=None, text_attention_mask=None, p_x0=None):
+    """DDPM update with caching and text conditioning."""
     assert self.config.noise.type == 'loglinear'
     sigma_t, _ = self.noise(t)
+    
     if t.ndim > 1:
-      t = t.squeeze(-1)
+        t = t.squeeze(-1)
     assert t.ndim == 1
+    
     move_chance_t = t[:, None, None]
     move_chance_s = (t - dt)[:, None, None]
-    assert move_chance_t.ndim == 3, move_chance_t.shape
+    
     if p_x0 is None:
-      p_x0 = self.forward(x, sigma_t).exp()
+        p_x0 = self.forward(
+            x, 
+            sigma_t,
+            text_embeddings=text_embeddings,
+            text_attention_mask=text_attention_mask
+        ).exp()
     
     assert move_chance_t.ndim == p_x0.ndim
     q_xs = p_x0 * (move_chance_t - move_chance_s)
@@ -647,27 +655,35 @@ class Diffusion(L.LightningModule):
     copy_flag = (x != self.mask_index).to(x.dtype)
     return p_x0, copy_flag * x + (1 - copy_flag) * _x
 
-  def _ddpm_update(self, x, t, dt):
+  
+  def _ddpm_update(self, x, t, dt, text_embeddings=None, text_attention_mask=None):
+    """DDPM update step with text conditioning."""
     sigma_t, _ = self.noise(t)
     sigma_s, _ = self.noise(t - dt)
+    
     if sigma_t.ndim > 1:
-      sigma_t = sigma_t.squeeze(-1)
+        sigma_t = sigma_t.squeeze(-1)
     if sigma_s.ndim > 1:
-      sigma_s = sigma_s.squeeze(-1)
+        sigma_s = sigma_s.squeeze(-1)
+        
     assert sigma_t.ndim == 1, sigma_t.shape
     assert sigma_s.ndim == 1, sigma_s.shape
+    
     move_chance_t = 1 - torch.exp(-sigma_t)
     move_chance_s = 1 - torch.exp(-sigma_s)
     move_chance_t = move_chance_t[:, None, None]
     move_chance_s = move_chance_s[:, None, None]
+    
     unet_conditioning = sigma_t
-    log_p_x0 = self.forward(x, unet_conditioning)
+    log_p_x0 = self.forward(
+        x, 
+        unet_conditioning,
+        text_embeddings=text_embeddings,
+        text_attention_mask=text_attention_mask
+    )
+    
     assert move_chance_t.ndim == log_p_x0.ndim
-    # Technically, this isn't q_xs since there's a division
-    # term that is missing. This division term doesn't affect
-    # the samples.
-    q_xs = log_p_x0.exp() * (move_chance_t
-                             - move_chance_s)
+    q_xs = log_p_x0.exp() * (move_chance_t - move_chance_s)
     q_xs[:, :, self.mask_index] = move_chance_s[:, :, 0]
     _x = _sample_categorical(q_xs)
 
@@ -693,46 +709,106 @@ class Diffusion(L.LightningModule):
     return x
 
   @torch.no_grad()
-  def _sample(self, num_steps=None, eps=1e-5):
-    """Generate samples from the model."""
+  def _sample(self, num_steps=None, eps=1e-5, text_prompts=None):
+    """Generate samples from the model with text conditioning.
+    
+    Args:
+        num_steps: Number of diffusion steps
+        eps: Small constant for numerical stability
+        text_prompts: List of text prompts for conditioning, one per sample
+    """
     batch_size_per_gpu = self.config.loader.eval_batch_size
+    
     if self.parameterization == 'ar':
-      return self._ar_sampler(batch_size_per_gpu)
-    # Lightning auto-casting is not working in this method for some reason
+        return self._ar_sampler(batch_size_per_gpu, text_prompts)
+        
+    # Process text prompts if provided
+    if text_prompts is not None:
+        # Ensure we have enough prompts
+        if len(text_prompts) < batch_size_per_gpu:
+            text_prompts = text_prompts * (batch_size_per_gpu // len(text_prompts) + 1)
+        text_prompts = text_prompts[:batch_size_per_gpu]
+        
+        # Get BERT embeddings
+        text_embeddings, text_attention_mask = self.bert_model(
+            text_prompts,
+            padding=True,
+            truncation=True,
+            return_tensors="pt"
+        ).values()
+        
+        # Move to device
+        text_embeddings = text_embeddings.to(self.device)
+        text_attention_mask = text_attention_mask.to(self.device)
+    else:
+        # Use dummy embeddings if no text provided
+        text_embeddings = torch.zeros(
+            (batch_size_per_gpu, 1, 768),  # BERT hidden size
+            device=self.device
+        )
+        text_attention_mask = torch.ones(
+            (batch_size_per_gpu, 1),
+            device=self.device,
+            dtype=torch.bool
+        )
+
+    # Setup sampling
     if num_steps is None:
-      num_steps = self.config.sampling.steps
+        num_steps = self.config.sampling.steps
+        
     x = self._sample_prior(
-      batch_size_per_gpu,
-      self.config.model.length).to(self.device)
-    timesteps = torch.linspace(
-      1, eps, num_steps + 1, device=self.device)
+        batch_size_per_gpu,
+        self.config.model.length
+    ).to(self.device)
+    
+    timesteps = torch.linspace(1, eps, num_steps + 1, device=self.device)
     dt = (1 - eps) / num_steps
     p_x0_cache = None
 
     for i in range(num_steps):
-      t = timesteps[i] * torch.ones(
-        x.shape[0], 1, device=self.device)
-      if self.sampler == 'ddpm':
-        x = self._ddpm_update(x, t, dt)
-      elif self.sampler == 'ddpm_cache':
-        p_x0_cache, x_next = self._ddpm_caching_update(
-          x, t, dt, p_x0=p_x0_cache)
-        if (not torch.allclose(x_next, x)
-            or self.time_conditioning):
-          # Disable caching
-          p_x0_cache = None
-        x = x_next
-      else:
-        x = self._analytic_update(x, t, dt)
+        t = timesteps[i] * torch.ones(x.shape[0], 1, device=self.device)
+        
+        if self.sampler == 'ddpm':
+            x = self._ddpm_update(
+                x, t, dt, 
+                text_embeddings=text_embeddings,
+                text_attention_mask=text_attention_mask
+            )
+        elif self.sampler == 'ddpm_cache':
+            p_x0_cache, x_next = self._ddpm_caching_update(
+                x, t, dt,
+                text_embeddings=text_embeddings,
+                text_attention_mask=text_attention_mask,
+                p_x0=p_x0_cache
+            )
+            if not torch.allclose(x_next, x) or self.time_conditioning:
+                p_x0_cache = None  # Disable caching
+            x = x_next
+        else:
+            x = self._analytic_update(
+                x, t, dt,
+                text_embeddings=text_embeddings,
+                text_attention_mask=text_attention_mask
+            )
 
+    # Final denoising step
     if self.config.sampling.noise_removal:
-      t = timesteps[-1] * torch.ones(x.shape[0], 1,
-                                     device=self.device)
-      if self.sampler == 'analytic':
-        x = self._denoiser_update(x, t)
-      else:
-        unet_conditioning = self.noise(t)[0]
-        x = self.forward(x, unet_conditioning).argmax(dim=-1)
+        t = timesteps[-1] * torch.ones(x.shape[0], 1, device=self.device)
+        if self.sampler == 'analytic':
+            x = self._denoiser_update(
+                x, t,
+                text_embeddings=text_embeddings,
+                text_attention_mask=text_attention_mask
+            )
+        else:
+            unet_conditioning = self.noise(t)[0]
+            x = self.forward(
+                x, 
+                unet_conditioning,
+                text_embeddings=text_embeddings,
+                text_attention_mask=text_attention_mask
+            ).argmax(dim=-1)
+    
     return x
 
   def restore_model_and_sample(self, num_steps, eps=1e-5):
@@ -756,49 +832,71 @@ class Diffusion(L.LightningModule):
     self.noise.train()
     return samples
 
-  def get_score(self, x, sigma):
-    model_output = self.forward(x, sigma)
+  def get_score(self, x, sigma, text_embeddings=None, text_attention_mask=None):
+    """Calculate score with text conditioning.
+    
+    Args:
+        x: Input tokens tensor
+        sigma: Noise level tensor
+        text_embeddings: Optional BERT embeddings for text conditioning
+        text_attention_mask: Optional attention mask for text embeddings
+    """
+    # Get model predictions with text conditioning
+    model_output = self.forward(
+        x, 
+        sigma,
+        text_embeddings=text_embeddings,
+        text_attention_mask=text_attention_mask
+    )
+    
     if self.parameterization == 'subs':
-      # score(x, t) = p_t(y) / p_t(x)
-      # => log score(x, t) = log p_t(y) - log p_t(x)
-      
-      # case 1: x = masked
-      #   (i) y = unmasked
-      #     log score(x, t) = log p_\theta(x)|_y + log k
-      #     where k = exp(- sigma) / (1 - exp(- sigma))
-      #   (ii) y = masked
-      #     log score(x, t) = 0
+        # score(x, t) = p_t(y) / p_t(x)
+        # => log score(x, t) = log p_t(y) - log p_t(x)
+        
+        # case 1: x = masked
+        #   (i) y = unmasked
+        #     log score(x, t) = log p_\theta(x)|_y + log k
+        #     where k = exp(- sigma) / (1 - exp(- sigma))
+        #   (ii) y = masked
+        #     log score(x, t) = 0
 
-      # case 2: x = unmasked
-      #   (i) y != masked, y != x
-      #     log score(x_i, t) = - inf
-      #   (ii) y = x 
-      #     log score(x_i, t) = 0
-      #   (iii) y = masked token
-      #     log score(x_i, t) = - log k
-      #     where k = exp(- sigma) / (1 - exp(- sigma))
-      
-      log_k = - torch.log(torch.expm1(sigma)).squeeze(-1)
-      assert log_k.ndim == 1
-      
-      masked_score = model_output + log_k[:, None, None]
-      masked_score[:, :, self.mask_index] = 0
+        # case 2: x = unmasked
+        #   (i) y != masked, y != x
+        #     log score(x_i, t) = - inf
+        #   (ii) y = x 
+        #     log score(x_i, t) = 0
+        #   (iii) y = masked token
+        #     log score(x_i, t) = - log k
+        #     where k = exp(- sigma) / (1 - exp(- sigma))
+        
+        log_k = - torch.log(torch.expm1(sigma)).squeeze(-1)
+        assert log_k.ndim == 1
+        
+        # Handle masked tokens
+        masked_score = model_output + log_k[:, None, None]
+        masked_score[:, :, self.mask_index] = 0
 
-      unmasked_score = self.neg_infinity * torch.ones_like(
-        model_output)
-      unmasked_score = torch.scatter(
-        unmasked_score,
-        -1,
-        x[..., None],
-        torch.zeros_like(unmasked_score[..., :1]))
-      unmasked_score[:, :, self.mask_index] = - (
-        log_k[:, None] * torch.ones_like(x))
-      
-      masked_indices = (x == self.mask_index).to(
-        model_output.dtype)[:, :, None]
-      model_output = (
-        masked_score * masked_indices
-        + unmasked_score * (1 - masked_indices))
+        # Handle unmasked tokens
+        unmasked_score = self.neg_infinity * torch.ones_like(model_output)
+        unmasked_score = torch.scatter(
+            unmasked_score,
+            -1,
+            x[..., None],
+            torch.zeros_like(unmasked_score[..., :1])
+        )
+        unmasked_score[:, :, self.mask_index] = -(
+            log_k[:, None] * torch.ones_like(x)
+        )
+        
+        # Combine scores based on mask
+        masked_indices = (x == self.mask_index).to(
+            model_output.dtype
+        )[:, :, None]
+        model_output = (
+            masked_score * masked_indices +
+            unmasked_score * (1 - masked_indices)
+        )
+        
     return model_output.exp()
 
   def _staggered_score(self, score, dsigma):
@@ -808,18 +906,33 @@ class Diffusion(L.LightningModule):
     score[..., self.mask_index] += extra_const
     return score
 
-  def _analytic_update(self, x, t, step_size):
+  def _analytic_update(self, x, t, step_size, text_embeddings=None, text_attention_mask=None):
+    """Analytic update step with text conditioning."""
     curr_sigma, _ = self.noise(t)
     next_sigma, _ = self.noise(t - step_size)
     dsigma = curr_sigma - next_sigma
-    score = self.get_score(x, curr_sigma)
+    
+    score = self.get_score(
+        x, 
+        curr_sigma,
+        text_embeddings=text_embeddings,
+        text_attention_mask=text_attention_mask
+    )
+    
     stag_score = self._staggered_score(score, dsigma)
     probs = stag_score * self._transp_transition(x, dsigma)
     return _sample_categorical(probs)
 
-  def _denoiser_update(self, x, t):
+  def _denoiser_update(self, x, t, text_embeddings=None, text_attention_mask=None):
+    """Denoiser update with text conditioning."""
     sigma, _ = self.noise(t)
-    score = self.get_score(x, sigma)
+    score = self.get_score(
+        x, 
+        sigma,
+        text_embeddings=text_embeddings,
+        text_attention_mask=text_attention_mask
+    )
+    
     stag_score = self._staggered_score(score, sigma)
     probs = stag_score * self._transp_transition(x, sigma)
     probs[..., self.mask_index] = 0
