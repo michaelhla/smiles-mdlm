@@ -9,3 +9,6 @@ source venv/bin/activate
 
 # Install requirements
 pip install -r requirements-pip.txt
+
+git config --global user.email michaelhla@college.harvard.edu
+git config --global user.name michaelhla
