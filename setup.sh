@@ -12,3 +12,5 @@ pip install -r requirements-pip.txt
 
 git config --global user.email michaelhla@college.harvard.edu
 git config --global user.name michaelhla
+
+echo "set up done, now run 'source venv/bin/activate' to activate the virtual environment"
