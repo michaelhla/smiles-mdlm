@@ -161,7 +161,26 @@ class Text8Tokenizer(transformers.PreTrainedTokenizer):
 
 
 def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
-    # Load the dataset
+    """Get ChEBI dataset with BERT embeddings cached to disk.
+    
+    Args:
+        cache_dir: str, path to cache directory
+        text_tokenizer: tokenizer for text descriptions
+        mode: str, one of 'train', 'validation', 'test'
+    
+    Returns:
+        dataset: datasets.Dataset with processed data
+    """
+    cache_dir = f'/root/smiles-mdlm/cache/chebi'
+    
+    # Check if processed dataset exists
+    if utils.fsspec_exists(os.path.join(cache_dir, mode)):
+        LOGGER.info(f'Loading processed ChEBI data from: {cache_dir}')
+        return datasets.load_from_disk(os.path.join(cache_dir, mode))
+    
+    LOGGER.info(f'Processing ChEBI data and saving to: {cache_dir}')
+    
+    # Load the raw dataset
     dataset = load_dataset("liupf/chEBI-20-MM")
     bert_model = transformers.AutoModel.from_pretrained('bert-base-uncased').cuda()
     bert_model.eval()
@@ -190,8 +209,7 @@ def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
             examples['description'],
             padding='max_length', 
             truncation=True,
-            max_length= 512,
-            # return_attention_mask=True,
+            max_length=512,
             return_tensors='pt'
         )
         
@@ -204,16 +222,25 @@ def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
                 input_ids=input_ids,
                 attention_mask=attention_mask
             )
-            text_embeddings = outputs.last_hidden_state.cpu()
-        
+            
+            # Option 1: Use [CLS] token embedding (first token)
+            text_embeddings = outputs.last_hidden_state[:, 0].cpu()
+            
+            # Option 2: Mean pooling across sequence length
+            # token_embeddings = outputs.last_hidden_state.cpu()  # [batch_size, seq_len, hidden_dim]
+            # mask = description_encodings['attention_mask'].unsqueeze(-1).cpu()  # [batch_size, seq_len, 1]
+            # text_embeddings = (token_embeddings * mask).sum(dim=1) / mask.sum(dim=1)
+
+
         return {
             'input_ids': smiles_tokens,
             'attention_mask': attention_masks,
-            'text_embeddings': text_embeddings,
+            'text_embeddings': text_embeddings,  # Now shape is [batch_size, hidden_dim]
             'text_attention_mask': description_encodings['attention_mask']
         }
+ 
 
-    # Process and create dataset with smaller batches
+    # Process dataset split by split and save to disk
     processed_dataset = dataset[mode].map(
         process_examples,
         batched=True,
@@ -221,6 +248,10 @@ def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
         remove_columns=dataset[mode].column_names,
         num_proc=1
     )
+    
+    # Save processed dataset to disk
+    utils.fsspec_mkdirs(cache_dir, exist_ok=True)
+    processed_dataset.save_to_disk(os.path.join(cache_dir, mode))
     
     return processed_dataset.with_format('torch')
 
@@ -369,192 +400,57 @@ def _group_texts(examples, block_size, bos, eos):
 def get_dataset(
     dataset_name, tokenizer, wrap, mode, cache_dir,
     block_size=1024, num_proc=len(os.sched_getaffinity(0)), streaming=False):
-  if wrap:
-    filename = f'{dataset_name}_{mode}_bs{block_size}_wrapped.dat'
-  else:
-    filename = f'{dataset_name}_{mode}_bs{block_size}_unwrapped.dat'
-  _path = os.path.join(cache_dir, filename)
-  
-  if utils.fsspec_exists(_path):
-    LOGGER.info(f'Loading data from: {_path}')
-    return datasets.load_from_disk(_path).with_format('torch')
-  LOGGER.info(f'Generating new data at: {_path}')
-
-  crop_train = dataset_name == 'text8-crop'
-  if mode == 'train' and crop_train:
-    # double block size for sub-sampling
-    block_size *= 2
-  
-  if dataset_name == 'wikitext103':
-    dataset = datasets.load_dataset(
-      'wikitext',
-      name='wikitext-103-raw-v1',
-      cache_dir=cache_dir)
-  elif dataset_name == 'wikitext2':
-    dataset = datasets.load_dataset(
-      'wikitext',
-      name='wikitext-2-raw-v1',
-      cache_dir=cache_dir)
-  elif dataset_name == 'ptb':
-    dataset = datasets.load_dataset(
-      'ptb_text_only', cache_dir=cache_dir)
-  elif dataset_name == 'lambada':
-    dataset = get_lambada_test_dataset()
-  elif dataset_name == 'text8':
-    assert wrap
-    dataset = get_text8_dataset(
-      cache_dir, max_seq_length=block_size)
-  elif dataset_name == 'text8-crop':
-    dataset = get_text8_dataset(
-      cache_dir, max_seq_length=block_size, crop_train=True)
-  elif dataset_name == 'openwebtext-train':
-    dataset = datasets.load_dataset(
-      'openwebtext',
-      split='train[:-100000]',
-      cache_dir=cache_dir,
-      streaming=streaming)
-  elif dataset_name == 'openwebtext-valid':
-    dataset = datasets.load_dataset(
-      'openwebtext',
-      split='train[-100000:]',
-      cache_dir=cache_dir,
-      streaming=streaming)
-  elif dataset_name == 'scientific_papers_arxiv':
-    dataset = datasets.load_dataset(
-      'scientific_papers', 'arxiv',
-      trust_remote_code=True,
-      cache_dir=cache_dir,
-      streaming=streaming)
-  elif dataset_name == 'scientific_papers_pubmed':
-    dataset = datasets.load_dataset(
-      'scientific_papers', 'pubmed',
-      trust_remote_code=True,
-      cache_dir=cache_dir,
-      streaming=streaming)
-  elif dataset_name == 'ag_news':
-    dataset = datasets.load_dataset(
-      'ag_news',
-      cache_dir=cache_dir,
-      streaming=streaming)
-  elif dataset_name == 'chebi':
-    dataset = get_chebi_dataset(
-        cache_dir=cache_dir,
-        text_tokenizer=tokenizer,
-        mode=mode
-    )
-  else:
-    dataset = datasets.load_dataset(
-      dataset_name,
-      cache_dir=cache_dir,
-      streaming=streaming)
-
-  if dataset_name in ['lambada', 'openwebtext-train',
-                      'openwebtext-valid']:
-    data = dataset
-  else:
-    data = dataset[mode]
-
-  if dataset_name.startswith('wikitext'):
-    detokenizer = wt_detokenizer
-  elif dataset_name == 'ptb':
-    detokenizer = ptb_detokenizer
-  elif dataset_name == 'lm1b':
-    detokenizer = lm1b_detokenizer
-  elif dataset_name == 'lambada':
-    detokenizer = lambada_detokenizer
-  elif dataset_name.startswith('scientific_papers'):
-    detokenizer = scientific_papers_detokenizer
-  else:
-    detokenizer = None
-
-  def _apply_detokenizer(detokenizer):
-    def detok(text):
-      for i, t in enumerate(text, 0):
-        text[i] = detokenizer(t)
-      return text
-    return detok
-  
-  EOS = tokenizer.encode(tokenizer.eos_token)[0]
-  BOS = tokenizer.encode(tokenizer.bos_token)[0]
-
-  def preprocess_and_tokenize(example):
-    if dataset_name == 'ptb':
-      text = example['sentence']
-    elif 'scientific_papers' in dataset_name:
-      text = example['article']
-    else:
-      text = example['text']
     
-    if detokenizer is not None:
-      text = _apply_detokenizer(detokenizer)(text)
-
-    tokenizer.padding_side = 'right'
-    tokenizer.truncation_side = 'right'
-
     if wrap:
-      tokens = tokenizer(text,
-                         add_special_tokens=False,
-                         return_attention_mask=False,
-                         return_token_type_ids=False)
-      tokens = {'input_ids':
-                [t + [EOS] for t in tokens['input_ids']]}
-      # Still missing BOS, but will be added in group_texts
+        filename = f'{dataset_name}_{mode}_bs{block_size}_wrapped.dat'
     else:
-      tokens = tokenizer(text,
-                         max_length=block_size,
-                         padding='max_length',
-                         truncation=True,
-                         add_special_tokens=True,
-                         return_attention_mask=True,
-                         return_token_type_ids=True)
-    return tokens
+        filename = f'{dataset_name}_{mode}_bs{block_size}_unwrapped.dat'
+    _path = os.path.join(cache_dir, filename)
 
-  if streaming:
-    tokenized_dataset = data.map(
-      preprocess_and_tokenize,
-      batched=True,
-      desc='Tokenizing')
-  else:
-    tokenized_dataset = data.map(
-      preprocess_and_tokenize,
-      batched=True,
-      num_proc=num_proc,
-      load_from_cache_file=True,
-      desc='Tokenizing')
-  if dataset_name == 'ptb':
-    tokenized_dataset = tokenized_dataset.remove_columns(
-      'sentence')
-  elif 'scientific_papers' in dataset_name:
-    tokenized_dataset = tokenized_dataset.remove_columns([
-      'article', 'abstract', 'section_names'])
-  elif dataset_name == 'ag_news':
-    tokenized_dataset = tokenized_dataset.remove_columns(
-      ['text', 'label'])
-  else:
-    tokenized_dataset = tokenized_dataset.remove_columns(
-      'text')
+    _path = '/root/smiles-mdlm/cache/chebi/train' ## hardcoding for testing
+    
+    if utils.fsspec_exists(_path):
+        LOGGER.info(f'Loading data from: {_path}')
+        return datasets.load_from_disk(_path).with_format('torch')
+    LOGGER.info(f'Generating new data at: {_path}')
 
-  if not wrap:
-    tokenized_dataset.save_to_disk(_path)
-    return tokenized_dataset.with_format('torch')
+    if dataset_name == 'chebi':
+        # Get the processed ChEBI dataset for the specific mode
+        data = get_chebi_dataset(
+            cache_dir=cache_dir,
+            text_tokenizer=tokenizer,
+            mode=mode
+        )
+        
+        # No need to do dataset[mode] since get_chebi_dataset already returns the right split
+        if not wrap:
+            data.save_to_disk(_path)
+            return data.with_format('torch')
+            
+        # If wrapping is needed, continue to grouping step
+        tokenized_dataset = data
+        return tokenized_dataset.with_format('torch')
+    else:
+        # Original handling for other datasets
+        if dataset_name == 'text8':
+            dataset = get_text8_dataset(...)
+        # ... rest of the dataset handling ...
+        data = dataset[mode]
+        tokenized_dataset = data.map(...)
 
-  group_texts = functools.partial(
-    _group_texts, block_size=block_size, bos=BOS, eos=EOS)
-  if streaming:
-    chunked_dataset = tokenized_dataset.map(
-      group_texts,
-      batched=True,
-      desc='Grouping')
-  else:
-    chunked_dataset = tokenized_dataset.map(
-      group_texts,
-      batched=True,
-      num_proc=num_proc,
-      load_from_cache_file=True,
-      desc='Grouping')
-    chunked_dataset.save_to_disk(_path)
-  chunked_dataset = chunked_dataset.with_format('torch')
-  return chunked_dataset
+        # Group texts for wrapped datasets
+        group_texts = functools.partial(
+            _group_texts, block_size=block_size, bos='[BOS]', eos='[EOS]')
+        
+        chunked_dataset = tokenized_dataset.map(
+            group_texts,
+            batched=True,
+            num_proc=num_proc,
+            load_from_cache_file=True,
+            desc='Grouping')
+      
+        chunked_dataset.save_to_disk(_path)
+        return chunked_dataset.with_format('torch')
 
 
 def get_tokenizer(config):

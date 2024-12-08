@@ -1,0 +1,266 @@
+wandb_version: 1
+
+T:
+  desc: null
+  value: 0
+_wandb:
+  desc: null
+  value:
+    cli_version: 0.13.5
+    framework: huggingface
+    huggingface_version: 4.38.2
+    is_jupyter_run: false
+    is_kaggle_kernel: false
+    m:
+    - 1: trainer/global_step
+      6:
+      - 3
+    python_version: 3.9.21
+    start_time: 1733636457.986324
+    t:
+      1:
+      - 1
+      - 11
+      - 41
+      - 49
+      - 50
+      - 51
+      - 55
+      - 63
+      2:
+      - 1
+      - 11
+      - 41
+      - 49
+      - 50
+      - 51
+      - 55
+      - 63
+      3:
+      - 7
+      - 13
+      - 14
+      - 15
+      - 16
+      - 23
+      4: 3.9.21
+      5: 0.13.5
+      6: 4.38.2
+      8:
+      - 5
+backbone:
+  desc: null
+  value: dit
+callbacks:
+  desc: null
+  value:
+    checkpoint_every_n_steps:
+      _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      auto_insert_metric_name: false
+      dirpath: /root/smiles-mdlm/outputs/chebi/2024.12.07/213701/checkpoints
+      every_n_train_steps: 500
+      save_last: true
+      save_top_k: -1
+      verbose: true
+    checkpoint_monitor:
+      _target_: lightning.pytorch.callbacks.ModelCheckpoint
+      auto_insert_metric_name: false
+      dirpath: /root/smiles-mdlm/outputs/chebi/2024.12.07/213701/checkpoints
+      filename: best
+      mode: min
+      monitor: val/nll
+      save_last: false
+      save_top_k: 1
+      verbose: true
+    learning_rate_monitor:
+      _target_: lightning.pytorch.callbacks.LearningRateMonitor
+      logging_interval: step
+checkpointing:
+  desc: null
+  value:
+    resume_ckpt_path: /root/smiles-mdlm/outputs/chebi/2024.12.07/213701/checkpoints/last.ckpt
+    resume_from_ckpt: true
+    save_dir: /root/smiles-mdlm/outputs/chebi/2024.12.07/213701
+config:
+  desc: null
+  value: '{''mode'': ''train'', ''diffusion'': ''absorbing_state'', ''backbone'':
+    ''dit'', ''parameterization'': ''subs'', ''time_conditioning'': False, ''T'':
+    0, ''subs_masking'': False, ''seed'': 1, ''loader'': {''global_batch_size'': 512,
+    ''eval_global_batch_size'': ''${.global_batch_size}'', ''batch_size'': ''${div_up:${.global_batch_size},
+    ${eval:${trainer.devices} * ${trainer.num_nodes}}}'', ''eval_batch_size'': ''${div_up:${.eval_global_batch_size},
+    ${eval:${trainer.devices} * ${trainer.num_nodes}}}'', ''num_workers'': ''${eval:"len(__import__(\''os\'').sched_getaffinity(0))"}'',
+    ''pin_memory'': True}, ''sampling'': {''predictor'': ''ddpm_cache'', ''steps'':
+    1000, ''noise_removal'': True, ''num_sample_batches'': 2, ''num_sample_log'':
+    2, ''semi_ar'': False, ''stride_length'': 1, ''num_strides'': 1}, ''training'':
+    {''ema'': 0.9999, ''antithetic_sampling'': True, ''importance_sampling'': False,
+    ''sampling_eps'': 0.001, ''change_of_variables'': False, ''max_epochs'': 100},
+    ''eval'': {''checkpoint_path'': '''', ''disable_ema'': False, ''compute_generative_perplexity'':
+    False, ''perplexity_batch_size'': 8, ''compute_perplexity_on_sanity'': False,
+    ''gen_ppl_eval_model_name_or_path'': ''gpt2-large'', ''generate_samples'': True},
+    ''optim'': {''weight_decay'': 0, ''lr'': 0.0003, ''beta1'': 0.9, ''beta2'': 0.999,
+    ''eps'': 1e-08}, ''trainer'': {''_target_'': ''lightning.Trainer'', ''accelerator'':
+    ''cuda'', ''num_nodes'': 1, ''devices'': ''${device_count:}'', ''accumulate_grad_batches'':
+    ''${div_up:${loader.global_batch_size}, ${eval:${trainer.devices} * ${loader.batch_size}
+    * ${trainer.num_nodes}}}'', ''gradient_clip_val'': 1.0, ''precision'': ''bf16'',
+    ''num_sanity_val_steps'': 2, ''max_steps'': 1000000, ''log_every_n_steps'': 10,
+    ''limit_train_batches'': 1.0, ''limit_val_batches'': 1.0, ''val_check_interval'':
+    10000}, ''wandb'': {''project'': ''text-diffusion'', ''notes'': ''Mulan for text'',
+    ''group'': None, ''job_type'': None, ''name'': ''mdlm-chebi'', ''id'': ''${.name}_${seed}'',
+    ''tags'': [''${noise.type}'', ''${data.train}'', ''${data.valid}'']}, ''checkpointing'':
+    {''save_dir'': ''${cwd:}'', ''resume_from_ckpt'': True, ''resume_ckpt_path'':
+    ''${.save_dir}/checkpoints/last.ckpt''}, ''callbacks'': {''checkpoint_every_n_steps'':
+    {''_target_'': ''lightning.pytorch.callbacks.ModelCheckpoint'', ''save_top_k'':
+    -1, ''save_last'': True, ''dirpath'': ''${checkpointing.save_dir}/checkpoints'',
+    ''verbose'': True, ''auto_insert_metric_name'': False, ''every_n_train_steps'':
+    500}, ''checkpoint_monitor'': {''_target_'': ''lightning.pytorch.callbacks.ModelCheckpoint'',
+    ''monitor'': ''val/nll'', ''mode'': ''min'', ''save_top_k'': 1, ''save_last'':
+    False, ''dirpath'': ''${checkpointing.save_dir}/checkpoints'', ''filename'': ''best'',
+    ''auto_insert_metric_name'': False, ''verbose'': True}, ''learning_rate_monitor'':
+    {''_target_'': ''lightning.pytorch.callbacks.LearningRateMonitor'', ''logging_interval'':
+    ''step''}}, ''data'': {''train'': ''chebi'', ''valid'': ''chebi'', ''tokenizer_name_or_path'':
+    ''bert-base-uncased'', ''smiles_tokenizer_type'': ''custom'', ''cache_dir'': ''./cache'',
+    ''wrap'': True, ''streaming'': False, ''model'': {''smiles_length'': 256, ''text_length'':
+    512}}, ''model'': {''_target_'': ''models.dit.DIT'', ''hidden_size'': 256, ''n_heads'':
+    4, ''n_blocks'': 6, ''dropout'': 0.2, ''cond_dim'': 768, ''length'': 128, ''scale_by_sigma'':
+    True, ''text_conditioning'': True}, ''strategy'': {''_target_'': ''lightning.pytorch.strategies.DDPStrategy'',
+    ''find_unused_parameters'': False}, ''noise'': {''type'': ''loglinear'', ''sigma_min'':
+    0.0001, ''sigma_max'': 20}, ''lr_scheduler'': {''_target_'': ''transformers.get_constant_schedule_with_warmup'',
+    ''num_warmup_steps'': 2500}}'
+data:
+  desc: null
+  value:
+    cache_dir: ./cache
+    model:
+      smiles_length: 256
+      text_length: 512
+    smiles_tokenizer_type: custom
+    streaming: false
+    tokenizer_name_or_path: bert-base-uncased
+    train: chebi
+    valid: chebi
+    wrap: true
+diffusion:
+  desc: null
+  value: absorbing_state
+eval:
+  desc: null
+  value:
+    checkpoint_path: ''
+    compute_generative_perplexity: false
+    compute_perplexity_on_sanity: false
+    disable_ema: false
+    gen_ppl_eval_model_name_or_path: gpt2-large
+    generate_samples: true
+    perplexity_batch_size: 8
+loader:
+  desc: null
+  value:
+    batch_size: 512
+    eval_batch_size: 512
+    eval_global_batch_size: 512
+    global_batch_size: 512
+    num_workers: 128
+    pin_memory: true
+lr_scheduler:
+  desc: null
+  value:
+    _target_: transformers.get_constant_schedule_with_warmup
+    num_warmup_steps: 2500
+mode:
+  desc: null
+  value: train
+model:
+  desc: null
+  value:
+    _target_: models.dit.DIT
+    cond_dim: 768
+    dropout: 0.2
+    hidden_size: 256
+    length: 128
+    n_blocks: 6
+    n_heads: 4
+    scale_by_sigma: true
+    text_conditioning: true
+noise:
+  desc: null
+  value:
+    sigma_max: 20
+    sigma_min: 0.0001
+    type: loglinear
+optim:
+  desc: null
+  value:
+    beta1: 0.9
+    beta2: 0.999
+    eps: 1.0e-08
+    lr: 0.0003
+    weight_decay: 0
+parameterization:
+  desc: null
+  value: subs
+sampling:
+  desc: null
+  value:
+    noise_removal: true
+    num_sample_batches: 2
+    num_sample_log: 2
+    num_strides: 1
+    predictor: ddpm_cache
+    semi_ar: false
+    steps: 1000
+    stride_length: 1
+seed:
+  desc: null
+  value: 1
+strategy:
+  desc: null
+  value:
+    _target_: lightning.pytorch.strategies.DDPStrategy
+    find_unused_parameters: false
+subs_masking:
+  desc: null
+  value: false
+time_conditioning:
+  desc: null
+  value: false
+tokenizer:
+  desc: null
+  value: null
+trainer:
+  desc: null
+  value:
+    _target_: lightning.Trainer
+    accelerator: cuda
+    accumulate_grad_batches: 1
+    devices: 1
+    gradient_clip_val: 1.0
+    limit_train_batches: 1.0
+    limit_val_batches: 1.0
+    log_every_n_steps: 10
+    max_steps: 1000000
+    num_nodes: 1
+    num_sanity_val_steps: 2
+    precision: bf16
+    val_check_interval: 10000
+training:
+  desc: null
+  value:
+    antithetic_sampling: true
+    change_of_variables: false
+    ema: 0.9999
+    importance_sampling: false
+    max_epochs: 100
+    sampling_eps: 0.001
+wandb:
+  desc: null
+  value:
+    group: null
+    id: mdlm-chebi_1
+    job_type: null
+    name: mdlm-chebi
+    notes: Mulan for text
+    project: text-diffusion
+    tags:
+    - loglinear
+    - chebi
+    - chebi

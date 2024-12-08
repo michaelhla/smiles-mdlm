@@ -25,6 +25,7 @@ class SMILESTokenizer:
         self.vocab = {}
         self.vocab.update(self.special_tokens)
         current_idx = len(self.special_tokens)
+        self.vocab_size = len(self.special_tokens) + len(self.atoms) + len(self.special_atoms) + len(self.bonds)
         
         # Add atoms
         for atom in self.atoms:
@@ -43,6 +44,7 @@ class SMILESTokenizer:
             
         # Create reverse vocabulary
         self.idx2token = {v: k for k, v in self.vocab.items()}
+
         
     def _find_atom_groups(self, smiles: str) -> List[str]:
         """Find all atom groups in brackets like [NH3+], [OH-], etc."""

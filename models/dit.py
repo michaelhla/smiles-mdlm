@@ -110,10 +110,6 @@ def rotate_half(x):
 
 
 def apply_rotary_pos_emb(qkv, cos, sin):
-    # Reshape cos/sin to match the target dimensions
-    cos = cos[0,:,0,0,:cos.shape[-1]//2]  # [seqlen, rotary_dim/2]
-    sin = sin[0,:,0,0,:sin.shape[-1]//2]  # [seqlen, rotary_dim/2]
-    
     # Split qkv into q, k, v
     q, k, v = qkv.unbind(dim=2)  # Each has shape [batch, seqlen, nheads, headdim]
     
@@ -125,10 +121,12 @@ def apply_rotary_pos_emb(qkv, cos, sin):
         t_rot = t[..., :rotary_dim]  # Get dimensions that will be rotated
         t_pass = t[..., rotary_dim:]  # Get dimensions that will not be rotated
         
-        # Apply rotation using euler's formula:
-        # exp(iθ) = cos(θ) + i*sin(θ)
-        # => rotate(x) = x*cos(θ) + rotate_half(x)*sin(θ)
-        t_embed = (t_rot * cos[..., None, :]) + (rotate_half(t_rot) * sin[..., None, :])
+        # Reshape cos/sin to match target dimensions
+        cos_t = cos.unsqueeze(2).expand(-1, -1, t.size(2), -1)  # Add head dimension
+        sin_t = sin.unsqueeze(2).expand(-1, -1, t.size(2), -1)  # Add head dimension
+        
+        # Apply rotation using euler's formula
+        t_embed = (t_rot * cos_t) + (rotate_half(t_rot) * sin_t)
         
         if t_pass.shape[-1] != 0:
             t.copy_(torch.cat((t_embed, t_pass), dim=-1))
@@ -458,7 +456,7 @@ class DDitFinalLayer(nn.Module):
     return x
 
 class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
-    def __init__(self, config, vocab_size: int):
+    def __init__(self, config, vocab_size: int, text_embed_dim=768):
         super().__init__()
         if type(config) == dict:
             config = omegaconf.OmegaConf.create(config)
@@ -472,7 +470,7 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         self.rotary_emb = Rotary(config.model.hidden_size // config.model.n_heads)
         
         # Text embedding projection
-        self.text_proj = nn.Linear(768, config.model.hidden_size)  # 768 is BERT hidden size
+        self.text_proj = nn.Linear(text_embed_dim, config.model.hidden_size)  # 768 is BERT hidden size
         
         # Position embeddings for input sequence
         self.pos_embed = nn.Parameter(torch.zeros(1, config.model.length, config.model.hidden_size))

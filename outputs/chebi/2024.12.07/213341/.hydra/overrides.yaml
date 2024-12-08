@@ -1,0 +1,8 @@
+- model=small_chebi
+- data=chebi
+- wandb.name=mdlm-chebi
+- parameterization=subs
+- backbone=dit
+- sampling.predictor=ddpm_cache
+- sampling.steps=1000
+- +training.max_epochs=100

@@ -1,0 +1,154 @@
+2024-12-07 21:45:06,374 INFO    StreamThr :81493 [internal.py:wandb_internal():88] W&B internal server running at pid: 81493, started at: 2024-12-07 21:45:06.372856
+2024-12-07 21:45:06,377 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: status
+2024-12-07 21:45:06,379 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: status
+2024-12-07 21:45:06,381 DEBUG   SenderThread:81493 [sender.py:send():303] send: header
+2024-12-07 21:45:06,381 INFO    WriterThread:81493 [datastore.py:open_for_write():75] open: ./wandb/run-20241207_214506-mdlm-chebi_1/run-mdlm-chebi_1.wandb
+2024-12-07 21:45:06,499 DEBUG   SenderThread:81493 [sender.py:send():303] send: run
+2024-12-07 21:45:06,525 INFO    SenderThread:81493 [sender.py:_maybe_setup_resume():593] checking resume status for None/text-diffusion/mdlm-chebi_1
+2024-12-07 21:45:06,925 INFO    SenderThread:81493 [sender.py:_maybe_setup_resume():656] configured resuming with: ResumeState(resumed=True,step=1,history=0,events=1,output=198,runtime=27.347379,wandb_runtime=25,summary={'_wandb': {'runtime': 25}},config={'T': {'desc': None, 'value': 0}, 'data': {'desc': None, 'value': {'wrap': True, 'model': {'text_length': 512, 'smiles_length': 256}, 'train': 'chebi', 'valid': 'chebi', 'cache_dir': './cache', 'streaming': False, 'smiles_tokenizer_type': 'custom', 'tokenizer_name_or_path': 'bert-base-uncased'}}, 'eval': {'desc': None, 'value': {'disable_ema': False, 'checkpoint_path': '', 'generate_samples': True, 'perplexity_batch_size': 8, 'compute_perplexity_on_sanity': False, 'compute_generative_perplexity': False, 'gen_ppl_eval_model_name_or_path': 'gpt2-large'}}, 'mode': {'desc': None, 'value': 'train'}, 'seed': {'desc': None, 'value': 1}, 'model': {'desc': None, 'value': {'length': 128, 'dropout': 0.2, 'n_heads': 4, '_target_': 'models.dit.DIT', 'cond_dim': 768, 'n_blocks': 6, 'hidden_size': 256, 'scale_by_sigma': True, 'text_conditioning': True}}, 'noise': {'desc': None, 'value': {'type': 'loglinear', 'sigma_max': 20, 'sigma_min': 0.0001}}, 'optim': {'desc': None, 'value': {'lr': 0.0003, 'eps': 1e-08, 'beta1': 0.9, 'beta2': 0.999, 'weight_decay': 0}}, 'wandb': {'desc': None, 'value': {'id': 'mdlm-chebi_1', 'name': 'mdlm-chebi', 'tags': ['loglinear', 'chebi', 'chebi'], 'group': None, 'notes': 'Mulan for text', 'project': 'text-diffusion', 'job_type': None}}, '_wandb': {'desc': None, 'value': {'m': [{'1': 'trainer/global_step', '6': [3]}], 't': {'1': [1, 11, 41, 49, 50, 51, 55, 63], '2': [1, 11, 41, 49, 50, 51, 55, 63], '3': [7, 13, 14, 15, 16, 23], '4': '3.9.21', '5': '0.13.5', '6': '4.38.2', '8': [5]}, 'framework': 'huggingface', 'start_time': 1733636457.986324, 'cli_version': '0.13.5', 'is_jupyter_run': False, 'python_version': '3.9.21', 'is_kaggle_kernel': False, 'huggingface_version': '4.38.2'}}, 'config': {'desc': None, 'value': '{\'mode\': \'train\', \'diffusion\': \'absorbing_state\', \'backbone\': \'dit\', \'parameterization\': \'subs\', \'time_conditioning\': False, \'T\': 0, \'subs_masking\': False, \'seed\': 1, \'loader\': {\'global_batch_size\': 512, \'eval_global_batch_size\': \'${.global_batch_size}\', \'batch_size\': \'${div_up:${.global_batch_size}, ${eval:${trainer.devices} * ${trainer.num_nodes}}}\', \'eval_batch_size\': \'${div_up:${.eval_global_batch_size}, ${eval:${trainer.devices} * ${trainer.num_nodes}}}\', \'num_workers\': \'${eval:"len(__import__(\\\'os\\\').sched_getaffinity(0))"}\', \'pin_memory\': True}, \'sampling\': {\'predictor\': \'ddpm_cache\', \'steps\': 1000, \'noise_removal\': True, \'num_sample_batches\': 2, \'num_sample_log\': 2, \'semi_ar\': False, \'stride_length\': 1, \'num_strides\': 1}, \'training\': {\'ema\': 0.9999, \'antithetic_sampling\': True, \'importance_sampling\': False, \'sampling_eps\': 0.001, \'change_of_variables\': False, \'max_epochs\': 100}, \'eval\': {\'checkpoint_path\': \'\', \'disable_ema\': False, \'compute_generative_perplexity\': False, \'perplexity_batch_size\': 8, \'compute_perplexity_on_sanity\': False, \'gen_ppl_eval_model_name_or_path\': \'gpt2-large\', \'generate_samples\': True}, \'optim\': {\'weight_decay\': 0, \'lr\': 0.0003, \'beta1\': 0.9, \'beta2\': 0.999, \'eps\': 1e-08}, \'trainer\': {\'_target_\': \'lightning.Trainer\', \'accelerator\': \'cuda\', \'num_nodes\': 1, \'devices\': \'${device_count:}\', \'accumulate_grad_batches\': \'${div_up:${loader.global_batch_size}, ${eval:${trainer.devices} * ${loader.batch_size} * ${trainer.num_nodes}}}\', \'gradient_clip_val\': 1.0, \'precision\': \'bf16\', \'num_sanity_val_steps\': 2, \'max_steps\': 1000000, \'log_every_n_steps\': 10, \'limit_train_batches\': 1.0, \'limit_val_batches\': 1.0, \'val_check_interval\': 10000}, \'wandb\': {\'project\': \'text-diffusion\', \'notes\': \'Mulan for text\', \'group\': None, \'job_type\': None, \'name\': \'mdlm-chebi\', \'id\': \'${.name}_${seed}\', \'tags\': [\'${noise.type}\', \'${data.train}\', \'${data.valid}\']}, \'checkpointing\': {\'save_dir\': \'${cwd:}\', \'resume_from_ckpt\': True, \'resume_ckpt_path\': \'${.save_dir}/checkpoints/last.ckpt\'}, \'callbacks\': {\'checkpoint_every_n_steps\': {\'_target_\': \'lightning.pytorch.callbacks.ModelCheckpoint\', \'save_top_k\': -1, \'save_last\': True, \'dirpath\': \'${checkpointing.save_dir}/checkpoints\', \'verbose\': True, \'auto_insert_metric_name\': False, \'every_n_train_steps\': 500}, \'checkpoint_monitor\': {\'_target_\': \'lightning.pytorch.callbacks.ModelCheckpoint\', \'monitor\': \'val/nll\', \'mode\': \'min\', \'save_top_k\': 1, \'save_last\': False, \'dirpath\': \'${checkpointing.save_dir}/checkpoints\', \'filename\': \'best\', \'auto_insert_metric_name\': False, \'verbose\': True}, \'learning_rate_monitor\': {\'_target_\': \'lightning.pytorch.callbacks.LearningRateMonitor\', \'logging_interval\': \'step\'}}, \'data\': {\'train\': \'chebi\', \'valid\': \'chebi\', \'tokenizer_name_or_path\': \'bert-base-uncased\', \'smiles_tokenizer_type\': \'custom\', \'cache_dir\': \'./cache\', \'wrap\': True, \'streaming\': False, \'model\': {\'smiles_length\': 256, \'text_length\': 512}}, \'model\': {\'_target_\': \'models.dit.DIT\', \'hidden_size\': 256, \'n_heads\': 4, \'n_blocks\': 6, \'dropout\': 0.2, \'cond_dim\': 768, \'length\': 128, \'scale_by_sigma\': True, \'text_conditioning\': True}, \'strategy\': {\'_target_\': \'lightning.pytorch.strategies.DDPStrategy\', \'find_unused_parameters\': False}, \'noise\': {\'type\': \'loglinear\', \'sigma_min\': 0.0001, \'sigma_max\': 20}, \'lr_scheduler\': {\'_target_\': \'transformers.get_constant_schedule_with_warmup\', \'num_warmup_steps\': 2500}}'}, 'loader': {'desc': None, 'value': {'batch_size': 512, 'pin_memory': True, 'num_workers': 128, 'eval_batch_size': 512, 'global_batch_size': 512, 'eval_global_batch_size': 512}}, 'trainer': {'desc': None, 'value': {'devices': 1, '_target_': 'lightning.Trainer', 'max_steps': 1000000, 'num_nodes': 1, 'precision': 'bf16', 'accelerator': 'cuda', 'gradient_clip_val': 1, 'limit_val_batches': 1, 'log_every_n_steps': 10, 'val_check_interval': 10000, 'limit_train_batches': 1, 'num_sanity_val_steps': 2, 'accumulate_grad_batches': 1}}, 'backbone': {'desc': None, 'value': 'dit'}, 'sampling': {'desc': None, 'value': {'steps': 1000, 'semi_ar': False, 'predictor': 'ddpm_cache', 'num_strides': 1, 'noise_removal': True, 'stride_length': 1, 'num_sample_log': 2, 'num_sample_batches': 2}}, 'strategy': {'desc': None, 'value': {'_target_': 'lightning.pytorch.strategies.DDPStrategy', 'find_unused_parameters': False}}, 'training': {'desc': None, 'value': {'ema': 0.9999, 'max_epochs': 100, 'sampling_eps': 0.001, 'antithetic_sampling': True, 'change_of_variables': False, 'importance_sampling': False}}, 'callbacks': {'desc': None, 'value': {'checkpoint_monitor': {'mode': 'min', 'dirpath': '/root/smiles-mdlm/outputs/chebi/2024.12.07/213701/checkpoints', 'monitor': 'val/nll', 'verbose': True, '_target_': 'lightning.pytorch.callbacks.ModelCheckpoint', 'filename': 'best', 'save_last': False, 'save_top_k': 1, 'auto_insert_metric_name': False}, 'learning_rate_monitor': {'_target_': 'lightning.pytorch.callbacks.LearningRateMonitor', 'logging_interval': 'step'}, 'checkpoint_every_n_steps': {'dirpath': '/root/smiles-mdlm/outputs/chebi/2024.12.07/213701/checkpoints', 'verbose': True, '_target_': 'lightning.pytorch.callbacks.ModelCheckpoint', 'save_last': True, 'save_top_k': -1, 'every_n_train_steps': 500, 'auto_insert_metric_name': False}}}, 'diffusion': {'desc': None, 'value': 'absorbing_state'}, 'tokenizer': {'desc': None, 'value': None}, 'lr_scheduler': {'desc': None, 'value': {'_target_': 'transformers.get_constant_schedule_with_warmup', 'num_warmup_steps': 2500}}, 'subs_masking': {'desc': None, 'value': False}, 'checkpointing': {'desc': None, 'value': {'save_dir': '/root/smiles-mdlm/outputs/chebi/2024.12.07/213701', 'resume_ckpt_path': '/root/smiles-mdlm/outputs/chebi/2024.12.07/213701/checkpoints/last.ckpt', 'resume_from_ckpt': True}}, 'parameterization': {'desc': None, 'value': 'subs'}, 'time_conditioning': {'desc': None, 'value': False}})
+2024-12-07 21:45:07,535 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: check_version
+2024-12-07 21:45:07,535 INFO    SenderThread:81493 [dir_watcher.py:__init__():216] watching files in: ./wandb/run-20241207_214506-mdlm-chebi_1/files
+2024-12-07 21:45:07,536 INFO    SenderThread:81493 [sender.py:_start_run_threads():928] run started: mdlm-chebi_1 with start time 1733636679.022256
+2024-12-07 21:45:07,536 DEBUG   SenderThread:81493 [sender.py:send():303] send: summary
+2024-12-07 21:45:07,536 INFO    SenderThread:81493 [sender.py:_save_file():1171] saving file wandb-summary.json with policy end
+2024-12-07 21:45:07,536 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: check_version
+2024-12-07 21:45:07,791 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: run_start
+2024-12-07 21:45:07,821 DEBUG   HandlerThread:81493 [system_info.py:__init__():31] System info init
+2024-12-07 21:45:07,821 DEBUG   HandlerThread:81493 [system_info.py:__init__():46] System info init done
+2024-12-07 21:45:07,821 INFO    HandlerThread:81493 [system_monitor.py:start():150] Starting system monitor
+2024-12-07 21:45:07,822 INFO    SystemMonitor:81493 [system_monitor.py:_start():116] Starting system asset monitoring threads
+2024-12-07 21:45:07,823 INFO    SystemMonitor:81493 [interfaces.py:start():168] Started cpu
+2024-12-07 21:45:07,824 INFO    SystemMonitor:81493 [interfaces.py:start():168] Started disk
+2024-12-07 21:45:07,826 INFO    SystemMonitor:81493 [interfaces.py:start():168] Started gpu
+2024-12-07 21:45:07,829 INFO    SystemMonitor:81493 [interfaces.py:start():168] Started memory
+2024-12-07 21:45:07,833 INFO    SystemMonitor:81493 [interfaces.py:start():168] Started network
+2024-12-07 21:45:07,834 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: stop_status
+2024-12-07 21:45:07,834 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: stop_status
+2024-12-07 21:45:08,143 DEBUG   SenderThread:81493 [sender.py:send():303] send: telemetry
+2024-12-07 21:45:08,143 DEBUG   SenderThread:81493 [sender.py:send():303] send: metric
+2024-12-07 21:45:08,143 DEBUG   SenderThread:81493 [sender.py:send():303] send: telemetry
+2024-12-07 21:45:08,143 DEBUG   SenderThread:81493 [sender.py:send():303] send: metric
+2024-12-07 21:45:08,143 WARNING SenderThread:81493 [sender.py:send_metric():1127] Seen metric with glob (shouldn't happen)
+2024-12-07 21:45:08,145 DEBUG   SenderThread:81493 [sender.py:send():303] send: config
+2024-12-07 21:45:08,549 INFO    Thread-12 :81493 [dir_watcher.py:_on_file_created():275] file/dir created: ./wandb/run-20241207_214506-mdlm-chebi_1/files/wandb-summary.json
+2024-12-07 21:45:08,550 INFO    Thread-12 :81493 [dir_watcher.py:_on_file_created():275] file/dir created: ./wandb/run-20241207_214506-mdlm-chebi_1/files/output.log
+2024-12-07 21:45:10,549 INFO    Thread-12 :81493 [dir_watcher.py:_on_file_modified():292] file/dir modified: ./wandb/run-20241207_214506-mdlm-chebi_1/files/output.log
+2024-12-07 21:45:23,482 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: stop_status
+2024-12-07 21:45:23,483 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: stop_status
+2024-12-07 21:45:32,650 INFO    Thread-12 :81493 [dir_watcher.py:_on_file_modified():292] file/dir modified: ./wandb/run-20241207_214506-mdlm-chebi_1/files/output.log
+2024-12-07 21:45:33,977 DEBUG   SenderThread:81493 [sender.py:send():303] send: exit
+2024-12-07 21:45:33,977 INFO    SenderThread:81493 [sender.py:send_exit():442] handling exit code: 1
+2024-12-07 21:45:33,977 INFO    SenderThread:81493 [sender.py:send_exit():444] handling runtime: 51
+2024-12-07 21:45:33,978 INFO    SenderThread:81493 [sender.py:_save_file():1171] saving file wandb-summary.json with policy end
+2024-12-07 21:45:33,978 INFO    SenderThread:81493 [sender.py:send_exit():450] send defer
+2024-12-07 21:45:33,979 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:33,979 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 0
+2024-12-07 21:45:33,979 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:33,979 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 0
+2024-12-07 21:45:33,979 INFO    SenderThread:81493 [sender.py:transition_state():463] send defer: 1
+2024-12-07 21:45:33,979 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:33,979 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 1
+2024-12-07 21:45:33,979 INFO    HandlerThread:81493 [system_monitor.py:finish():160] Stopping system monitor
+2024-12-07 21:45:33,980 DEBUG   SystemMonitor:81493 [system_monitor.py:_start():130] Starting system metrics aggregation loop
+2024-12-07 21:45:33,981 INFO    HandlerThread:81493 [interfaces.py:finish():173] Joined cpu
+2024-12-07 21:45:33,981 INFO    HandlerThread:81493 [interfaces.py:finish():173] Joined disk
+2024-12-07 21:45:33,981 DEBUG   SystemMonitor:81493 [system_monitor.py:_start():137] Finished system metrics aggregation loop
+2024-12-07 21:45:33,981 DEBUG   SystemMonitor:81493 [system_monitor.py:_start():141] Publishing last batch of metrics
+2024-12-07 21:45:34,055 INFO    HandlerThread:81493 [interfaces.py:finish():173] Joined gpu
+2024-12-07 21:45:34,055 INFO    HandlerThread:81493 [interfaces.py:finish():173] Joined memory
+2024-12-07 21:45:34,055 INFO    HandlerThread:81493 [interfaces.py:finish():173] Joined network
+2024-12-07 21:45:34,056 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:34,056 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 1
+2024-12-07 21:45:34,056 INFO    SenderThread:81493 [sender.py:transition_state():463] send defer: 2
+2024-12-07 21:45:34,056 DEBUG   SenderThread:81493 [sender.py:send():303] send: stats
+2024-12-07 21:45:34,057 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:34,057 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 2
+2024-12-07 21:45:34,058 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:34,058 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 2
+2024-12-07 21:45:34,058 INFO    SenderThread:81493 [sender.py:transition_state():463] send defer: 3
+2024-12-07 21:45:34,058 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:34,058 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 3
+2024-12-07 21:45:34,058 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:34,058 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 3
+2024-12-07 21:45:34,058 INFO    SenderThread:81493 [sender.py:transition_state():463] send defer: 4
+2024-12-07 21:45:34,059 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:34,059 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 4
+2024-12-07 21:45:34,059 DEBUG   SenderThread:81493 [sender.py:send():303] send: summary
+2024-12-07 21:45:34,059 INFO    SenderThread:81493 [sender.py:_save_file():1171] saving file wandb-summary.json with policy end
+2024-12-07 21:45:34,060 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:34,060 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 4
+2024-12-07 21:45:34,060 INFO    SenderThread:81493 [sender.py:transition_state():463] send defer: 5
+2024-12-07 21:45:34,060 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:34,060 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 5
+2024-12-07 21:45:34,060 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:34,060 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 5
+2024-12-07 21:45:34,417 INFO    SenderThread:81493 [sender.py:transition_state():463] send defer: 6
+2024-12-07 21:45:34,418 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:34,418 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 6
+2024-12-07 21:45:34,419 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:34,419 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 6
+2024-12-07 21:45:34,651 INFO    Thread-12 :81493 [dir_watcher.py:_on_file_modified():292] file/dir modified: ./wandb/run-20241207_214506-mdlm-chebi_1/files/wandb-summary.json
+2024-12-07 21:45:34,651 INFO    Thread-12 :81493 [dir_watcher.py:_on_file_modified():292] file/dir modified: ./wandb/run-20241207_214506-mdlm-chebi_1/files/output.log
+2024-12-07 21:45:34,651 INFO    Thread-12 :81493 [dir_watcher.py:_on_file_modified():292] file/dir modified: ./wandb/run-20241207_214506-mdlm-chebi_1/files/config.yaml
+2024-12-07 21:45:34,952 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: poll_exit
+2024-12-07 21:45:36,651 INFO    Thread-12 :81493 [dir_watcher.py:_on_file_modified():292] file/dir modified: ./wandb/run-20241207_214506-mdlm-chebi_1/files/output.log
+2024-12-07 21:45:38,360 INFO    SenderThread:81493 [sender.py:transition_state():463] send defer: 7
+2024-12-07 21:45:38,360 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: poll_exit
+2024-12-07 21:45:38,361 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:38,361 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 7
+2024-12-07 21:45:38,362 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:38,362 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 7
+2024-12-07 21:45:38,362 INFO    SenderThread:81493 [dir_watcher.py:finish():362] shutting down directory watcher
+2024-12-07 21:45:38,652 INFO    Thread-12 :81493 [dir_watcher.py:_on_file_modified():292] file/dir modified: ./wandb/run-20241207_214506-mdlm-chebi_1/files/output.log
+2024-12-07 21:45:38,653 INFO    SenderThread:81493 [dir_watcher.py:finish():392] scan: ./wandb/run-20241207_214506-mdlm-chebi_1/files
+2024-12-07 21:45:38,653 INFO    SenderThread:81493 [dir_watcher.py:finish():406] scan save: ./wandb/run-20241207_214506-mdlm-chebi_1/files/config.yaml config.yaml
+2024-12-07 21:45:38,654 INFO    SenderThread:81493 [dir_watcher.py:finish():406] scan save: ./wandb/run-20241207_214506-mdlm-chebi_1/files/wandb-summary.json wandb-summary.json
+2024-12-07 21:45:38,654 INFO    SenderThread:81493 [dir_watcher.py:finish():406] scan save: ./wandb/run-20241207_214506-mdlm-chebi_1/files/output.log output.log
+2024-12-07 21:45:38,660 INFO    SenderThread:81493 [sender.py:transition_state():463] send defer: 8
+2024-12-07 21:45:38,660 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:38,660 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 8
+2024-12-07 21:45:38,666 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:38,666 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 8
+2024-12-07 21:45:38,666 INFO    SenderThread:81493 [file_pusher.py:finish():168] shutting down file pusher
+2024-12-07 21:45:39,428 INFO    Thread-16 :81493 [upload_job.py:push():143] Uploaded file ./wandb/run-20241207_214506-mdlm-chebi_1/files/wandb-summary.json
+2024-12-07 21:45:39,492 INFO    Thread-15 :81493 [upload_job.py:push():143] Uploaded file ./wandb/run-20241207_214506-mdlm-chebi_1/files/config.yaml
+2024-12-07 21:45:39,505 INFO    Thread-17 :81493 [upload_job.py:push():143] Uploaded file ./wandb/run-20241207_214506-mdlm-chebi_1/files/output.log
+2024-12-07 21:45:39,706 INFO    Thread-11 :81493 [sender.py:transition_state():463] send defer: 9
+2024-12-07 21:45:39,706 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:39,706 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 9
+2024-12-07 21:45:39,707 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:39,707 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 9
+2024-12-07 21:45:39,707 INFO    SenderThread:81493 [file_pusher.py:join():173] waiting for file pusher
+2024-12-07 21:45:39,707 INFO    SenderThread:81493 [sender.py:transition_state():463] send defer: 10
+2024-12-07 21:45:39,707 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:39,708 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 10
+2024-12-07 21:45:39,708 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:39,708 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 10
+2024-12-07 21:45:39,871 INFO    SenderThread:81493 [sender.py:transition_state():463] send defer: 11
+2024-12-07 21:45:39,871 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:39,871 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 11
+2024-12-07 21:45:39,871 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:39,872 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 11
+2024-12-07 21:45:39,872 INFO    SenderThread:81493 [sender.py:transition_state():463] send defer: 12
+2024-12-07 21:45:39,872 DEBUG   SenderThread:81493 [sender.py:send():303] send: final
+2024-12-07 21:45:39,873 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: defer
+2024-12-07 21:45:39,873 INFO    HandlerThread:81493 [handler.py:handle_request_defer():162] handle defer: 12
+2024-12-07 21:45:39,873 DEBUG   SenderThread:81493 [sender.py:send():303] send: footer
+2024-12-07 21:45:39,873 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: defer
+2024-12-07 21:45:39,873 INFO    SenderThread:81493 [sender.py:send_request_defer():459] handle sender defer: 12
+2024-12-07 21:45:39,875 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: poll_exit
+2024-12-07 21:45:39,875 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: server_info
+2024-12-07 21:45:39,875 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: get_summary
+2024-12-07 21:45:39,876 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: poll_exit
+2024-12-07 21:45:39,876 DEBUG   SenderThread:81493 [sender.py:send_request():317] send_request: server_info
+2024-12-07 21:45:39,881 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: sampled_history
+2024-12-07 21:45:40,410 INFO    MainThread:81493 [wandb_run.py:_footer_history_summary_info():3377] rendering history
+2024-12-07 21:45:40,410 INFO    MainThread:81493 [wandb_run.py:_footer_history_summary_info():3409] rendering summary
+2024-12-07 21:45:40,410 INFO    MainThread:81493 [wandb_run.py:_footer_sync_info():3333] logging synced files
+2024-12-07 21:45:40,411 DEBUG   HandlerThread:81493 [handler.py:handle_request():139] handle_request: shutdown
+2024-12-07 21:45:40,411 INFO    HandlerThread:81493 [handler.py:finish():814] shutting down handler
+2024-12-07 21:45:40,874 INFO    WriterThread:81493 [datastore.py:close():279] close: ./wandb/run-20241207_214506-mdlm-chebi_1/run-mdlm-chebi_1.wandb
+2024-12-07 21:45:41,409 INFO    SenderThread:81493 [sender.py:finish():1331] shutting down sender
+2024-12-07 21:45:41,410 INFO    SenderThread:81493 [file_pusher.py:finish():168] shutting down file pusher
+2024-12-07 21:45:41,410 INFO    SenderThread:81493 [file_pusher.py:join():173] waiting for file pusher
+2024-12-07 21:45:41,414 INFO    MainThread:81493 [internal.py:handle_exit():78] Internal process exited

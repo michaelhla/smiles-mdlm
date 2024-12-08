@@ -11,6 +11,7 @@ import torch
 import dataloader
 import diffusion
 import utils
+from smiles_tokenizer import SMILESTokenizer
 
 omegaconf.OmegaConf.register_new_resolver(
   'cwd', os.getcwd)
@@ -69,7 +70,7 @@ def _print_config(
 
 
 @L.pytorch.utilities.rank_zero_only
-def _print_batch(train_ds, valid_ds, tokenizer, k=64):
+def _print_batch(train_ds, valid_ds, tokenizer, smiles_tokenizer, k=64):
   for dl_type, dl in [
     ('train', train_ds), ('valid', valid_ds)]:
     print(f'Printing {dl_type} dataloader batch.')
@@ -77,13 +78,14 @@ def _print_batch(train_ds, valid_ds, tokenizer, k=64):
     print('Batch input_ids.shape', batch['input_ids'].shape)
     first = batch['input_ids'][0, :k]
     last = batch['input_ids'][0, -k:]
-    print(f'First {k} tokens:', tokenizer.decode(first))
+    print(f'First {k} SMILES tokens:', smiles_tokenizer.decode(first))
     print('ids:', first)
-    print(f'Last {k} tokens:', tokenizer.decode(last))
+    print(f'Last {k} SMILES tokens:', smiles_tokenizer.decode(last))
     print('ids:', last)
+    print('Text embeddings shape:', batch['text_embeddings'].shape)
 
-
-def generate_samples(config, logger, tokenizer):
+## TODO: add smiles_tokenizer to the function signature and add text guidance
+def generate_samples(config, logger, tokenizer, smiles_tokenizer):
   logger.info('Generating samples.')
   model = _load_from_checkpoint(config=config,
                                 tokenizer=tokenizer)
@@ -145,7 +147,7 @@ def _ppl_eval(config, logger, tokenizer):
   trainer.validate(model, valid_ds)
 
 
-def _train(config, logger, tokenizer):
+def _train(config, logger, tokenizer, smiles_tokenizer):
   logger.info('Starting Training.')
   wandb_logger = None
   if config.get('wandb', None) is not None:
@@ -169,7 +171,7 @@ def _train(config, logger, tokenizer):
 
   train_ds, valid_ds = dataloader.get_dataloaders(
     config, tokenizer)
-  _print_batch(train_ds, valid_ds, tokenizer)
+  _print_batch(train_ds, valid_ds, tokenizer, smiles_tokenizer)
 
   model = diffusion.Diffusion(
     config, tokenizer=valid_ds.tokenizer)
@@ -192,13 +194,14 @@ def main(config):
   
   logger = utils.get_logger(__name__)
   tokenizer = dataloader.get_tokenizer(config)
+  smiles_tokenizer = SMILESTokenizer()
 
   if config.mode == 'sample_eval':
     generate_samples(config, logger, tokenizer)
   elif config.mode == 'ppl_eval':
     _ppl_eval(config, logger, tokenizer)
   else:
-    _train(config, logger, tokenizer)
+    _train(config, logger, tokenizer, smiles_tokenizer)
 
 
 if __name__ == '__main__':

@@ -1,0 +1,226 @@
+
+Sanity Checking: |                                                                                                                         | 0/? [00:00<?, ?it/s]
+LOCAL_RANK: 0 - CUDA_VISIBLE_DEVICES: [0]
+  | Name           | Type             | Params
+----------------------------------------------------
+0 | bert_model     | BertModel        | 109 M
+1 | backbone       | DIT              | 48.6 M
+2 | softplus       | Softplus         | 0
+3 | train_metrics  | MetricCollection | 0
+4 | valid_metrics  | MetricCollection | 0
+5 | test_metrics   | MetricCollection | 0
+6 | gen_ppl_metric | Perplexity       | 0
+7 | noise          | LogLinearNoise   | 0
+----------------------------------------------------
+48.6 M    Trainable params
+109 M     Non-trainable params
+158 M     Total params
+
+Sanity Checking DataLoader 0:   0%|                                                                                                        | 0/2 [00:00<?, ?it/s]
+Error executing job with overrides: ['model=small_chebi', 'data=chebi', 'wandb.name=mdlm-chebi', 'parameterization=subs', 'backbone=dit', 'sampling.predictor=ddpm_cache', 'sampling.steps=1000', '+training.max_epochs=100']
+Traceback (most recent call last):
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/einops/einops.py", line 523, in reduce
+    return _apply_recipe(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/einops/einops.py", line 234, in _apply_recipe
+    init_shapes, axes_reordering, reduced_axes, added_axes, final_shapes, n_axes_w_added = _reconstruct_from_shape(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/einops/einops.py", line 187, in _reconstruct_from_shape_uncached
+    raise EinopsError(f"Shape mismatch, can't divide axis of length {length} in chunks of {known_product}")
+einops.EinopsError: Shape mismatch, can't divide axis of length 768 in chunks of 36
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+  File "/root/smiles-mdlm/main.py", line 208, in <module>
+    main()
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/utils.py", line 223, in run_and_report
+    raise ex
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/hydra.py", line 132, in run
+    _ = ret.return_value
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/core/utils.py", line 260, in return_value
+    raise self._return_value
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+  File "/root/smiles-mdlm/main.py", line 204, in main
+    _train(config, logger, tokenizer, smiles_tokenizer)
+  File "/root/smiles-mdlm/main.py", line 185, in _train
+    trainer.fit(model, train_ds, valid_ds, ckpt_path=ckpt_path)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 987, in _run
+    results = self._run_stage()
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 1031, in _run_stage
+    self._run_sanity_check()
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 1060, in _run_sanity_check
+    val_loop.run()
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/loops/utilities.py", line 182, in _decorator
+    return loop_run(self, *args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/loops/evaluation_loop.py", line 135, in run
+    self._evaluation_step(batch, batch_idx, dataloader_idx, dataloader_iter)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/loops/evaluation_loop.py", line 396, in _evaluation_step
+    output = call._call_strategy_hook(trainer, hook_name, *step_args)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/call.py", line 309, in _call_strategy_hook
+    output = fn(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/strategies/strategy.py", line 411, in validation_step
+    return self._forward_redirection(self.model, self.lightning_module, "validation_step", *args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/strategies/strategy.py", line 642, in __call__
+    wrapper_output = wrapper_module(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/parallel/distributed.py", line 1523, in forward
+    else self._run_ddp_forward(*inputs, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/parallel/distributed.py", line 1359, in _run_ddp_forward
+    return self.module(*inputs, **kwargs)  # type: ignore[index]
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/strategies/strategy.py", line 635, in wrapped_forward
+    out = method(*_args, **_kwargs)
+  File "/root/smiles-mdlm/diffusion.py", line 451, in validation_step
+    return self._compute_loss(batch, prefix='val')
+  File "/root/smiles-mdlm/diffusion.py", line 399, in _compute_loss
+    losses = self._loss(
+  File "/root/smiles-mdlm/diffusion.py", line 1062, in _loss
+    loss = self._forward_pass_diffusion(
+  File "/root/smiles-mdlm/diffusion.py", line 1018, in _forward_pass_diffusion
+    model_output = self.forward(
+  File "/root/smiles-mdlm/diffusion.py", line 344, in forward
+    logits = self.backbone(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/smiles-mdlm/models/dit.py", line 536, in forward
+    x = block(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/smiles-mdlm/models/dit.py", line 286, in forward
+    qkv = rearrange(qkv, 'b s (three h d) -> b s three h d', three=3, h=self.n_heads)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/einops/einops.py", line 591, in rearrange
+    return reduce(tensor, pattern, reduction="rearrange", **axes_lengths)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/einops/einops.py", line 533, in reduce
+    raise EinopsError(message + "\n {}".format(e))
+einops.EinopsError:  Error while processing rearrange-reduction pattern "b s (three h d) -> b s three h d".
+ Input tensor shape: torch.Size([512, 128, 768]). Additional info: {'three': 3, 'h': 12}.
+ Shape mismatch, can't divide axis of length 768 in chunks of 36
+Traceback (most recent call last):
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/einops/einops.py", line 523, in reduce
+    return _apply_recipe(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/einops/einops.py", line 234, in _apply_recipe
+    init_shapes, axes_reordering, reduced_axes, added_axes, final_shapes, n_axes_w_added = _reconstruct_from_shape(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/einops/einops.py", line 187, in _reconstruct_from_shape_uncached
+    raise EinopsError(f"Shape mismatch, can't divide axis of length {length} in chunks of {known_product}")
+einops.EinopsError: Shape mismatch, can't divide axis of length 768 in chunks of 36
+During handling of the above exception, another exception occurred:
+Traceback (most recent call last):
+  File "/root/smiles-mdlm/main.py", line 208, in <module>
+    main()
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/main.py", line 94, in decorated_main
+    _run_hydra(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/utils.py", line 394, in _run_hydra
+    _run_app(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/utils.py", line 457, in _run_app
+    run_and_report(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/utils.py", line 223, in run_and_report
+    raise ex
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/utils.py", line 220, in run_and_report
+    return func()
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/utils.py", line 458, in <lambda>
+    lambda: hydra.run(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/_internal/hydra.py", line 132, in run
+    _ = ret.return_value
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/core/utils.py", line 260, in return_value
+    raise self._return_value
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/hydra/core/utils.py", line 186, in run_job
+    ret.return_value = task_function(task_cfg)
+  File "/root/smiles-mdlm/main.py", line 204, in main
+    _train(config, logger, tokenizer, smiles_tokenizer)
+  File "/root/smiles-mdlm/main.py", line 185, in _train
+    trainer.fit(model, train_ds, valid_ds, ckpt_path=ckpt_path)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 544, in fit
+    call._call_and_handle_interrupt(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/call.py", line 43, in _call_and_handle_interrupt
+    return trainer.strategy.launcher.launch(trainer_fn, *args, trainer=trainer, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/strategies/launchers/subprocess_script.py", line 105, in launch
+    return function(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 580, in _fit_impl
+    self._run(model, ckpt_path=ckpt_path)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 987, in _run
+    results = self._run_stage()
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 1031, in _run_stage
+    self._run_sanity_check()
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/trainer.py", line 1060, in _run_sanity_check
+    val_loop.run()
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/loops/utilities.py", line 182, in _decorator
+    return loop_run(self, *args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/loops/evaluation_loop.py", line 135, in run
+    self._evaluation_step(batch, batch_idx, dataloader_idx, dataloader_iter)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/loops/evaluation_loop.py", line 396, in _evaluation_step
+    output = call._call_strategy_hook(trainer, hook_name, *step_args)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/trainer/call.py", line 309, in _call_strategy_hook
+    output = fn(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/strategies/strategy.py", line 411, in validation_step
+    return self._forward_redirection(self.model, self.lightning_module, "validation_step", *args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/strategies/strategy.py", line 642, in __call__
+    wrapper_output = wrapper_module(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/parallel/distributed.py", line 1523, in forward
+    else self._run_ddp_forward(*inputs, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/parallel/distributed.py", line 1359, in _run_ddp_forward
+    return self.module(*inputs, **kwargs)  # type: ignore[index]
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/lightning/pytorch/strategies/strategy.py", line 635, in wrapped_forward
+    out = method(*_args, **_kwargs)
+  File "/root/smiles-mdlm/diffusion.py", line 451, in validation_step
+    return self._compute_loss(batch, prefix='val')
+  File "/root/smiles-mdlm/diffusion.py", line 399, in _compute_loss
+    losses = self._loss(
+  File "/root/smiles-mdlm/diffusion.py", line 1062, in _loss
+    loss = self._forward_pass_diffusion(
+  File "/root/smiles-mdlm/diffusion.py", line 1018, in _forward_pass_diffusion
+    model_output = self.forward(
+  File "/root/smiles-mdlm/diffusion.py", line 344, in forward
+    logits = self.backbone(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/smiles-mdlm/models/dit.py", line 536, in forward
+    x = block(
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1511, in _wrapped_call_impl
+    return self._call_impl(*args, **kwargs)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/torch/nn/modules/module.py", line 1520, in _call_impl
+    return forward_call(*args, **kwargs)
+  File "/root/smiles-mdlm/models/dit.py", line 286, in forward
+    qkv = rearrange(qkv, 'b s (three h d) -> b s three h d', three=3, h=self.n_heads)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/einops/einops.py", line 591, in rearrange
+    return reduce(tensor, pattern, reduction="rearrange", **axes_lengths)
+  File "/root/smiles-mdlm/venv/lib/python3.9/site-packages/einops/einops.py", line 533, in reduce
+    raise EinopsError(message + "\n {}".format(e))
+einops.EinopsError:  Error while processing rearrange-reduction pattern "b s (three h d) -> b s three h d".
+ Input tensor shape: torch.Size([512, 128, 768]). Additional info: {'three': 3, 'h': 12}.
+ Shape mismatch, can't divide axis of length 768 in chunks of 36
