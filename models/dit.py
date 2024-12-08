@@ -77,65 +77,46 @@ def modulate_fused(x: torch.Tensor,
 
 
 class Rotary(torch.nn.Module):
-  def __init__(self, dim, base=10_000):
-    super().__init__()
-    inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
-    self.register_buffer('inv_freq', inv_freq)
-    self.seq_len_cached = None
-    self.cos_cached = None
-    self.sin_cached = None
+    def __init__(self, dim, base=10_000):
+        super().__init__()
+        inv_freq = 1.0 / (base ** (torch.arange(0, dim, 2).float() / dim))
+        self.register_buffer('inv_freq', inv_freq)
+        self.seq_len_cached = None
+        self.cos_cached = None
+        self.sin_cached = None
 
-  def forward(self, x, seq_dim=1):
-    seq_len = x.shape[seq_dim]
-    if seq_len != self.seq_len_cached:
-      self.seq_len_cached = seq_len
-      t = torch.arange(x.shape[seq_dim], device=x.device).type_as(self.inv_freq)
-      freqs = torch.einsum("i,j->ij", t, self.inv_freq.clone())
-      emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
-      # dims are: batch, seq_len, qkv, head, dim
-      self.cos_cached = emb.cos()[None, :, None, None, :].repeat(1,1,3,1,1)
-      self.sin_cached = emb.sin()[None, :, None, None, :].repeat(1,1,3,1,1)
-      # This makes the transformation on v an identity.
-      self.cos_cached[:,:,2,:,:].fill_(1.)
-      self.sin_cached[:,:,2,:,:].fill_(0.)
-
-    return self.cos_cached, self.sin_cached
-
-
-def rotate_half(x):
-    """Rotates half the hidden dims of the input."""
-    x1 = x[..., :x.shape[-1] // 2]
-    x2 = x[..., x.shape[-1] // 2:]
-    return torch.cat((-x2, x1), dim=-1)
+    def forward(self, x, seq_dim=1):
+        seq_len = x.shape[seq_dim]
+        if seq_len != self.seq_len_cached:
+            self.seq_len_cached = seq_len
+            t = torch.arange(x.shape[seq_dim], device=x.device).type_as(self.inv_freq)
+            freqs = torch.einsum("i,j->ij", t, self.inv_freq)
+            emb = torch.cat((freqs, freqs), dim=-1).to(x.device)
+            # Simpler shape: [1, seq_len, 1, dim]
+            self.cos_cached = emb.cos()[None, :, None, :]
+            self.sin_cached = emb.sin()[None, :, None, :]
+        return self.cos_cached, self.sin_cached
 
 
 def apply_rotary_pos_emb(qkv, cos, sin):
     # Split qkv into q, k, v
-    q, k, v = qkv.unbind(dim=2)  # Each has shape [batch, seqlen, nheads, headdim]
+    q, k, v = qkv.unbind(dim=2)  # [batch, seq_len, head, dim]
     
-    # Get rotary dim
-    rotary_dim = cos.shape[-1] * 2
+    # Apply rotary embeddings to q and k only
+    def rotate_tokens(t):
+        t1, t2 = t.chunk(2, dim=-1)
+        return torch.cat((-t2, t1), dim=-1)
+
+    # Expand cos and sin to match q/k dimensions
+    cos = cos.expand(q.shape[0], -1, q.shape[2], -1)  # [batch, seq_len, head, dim]
+    sin = sin.expand(q.shape[0], -1, q.shape[2], -1)
     
-    # Handle q and k, leave v unchanged
-    for t in (q, k):
-        t_rot = t[..., :rotary_dim]  # Get dimensions that will be rotated
-        t_pass = t[..., rotary_dim:]  # Get dimensions that will not be rotated
-        
-        # Reshape cos/sin to match target dimensions
-        cos_t = cos.unsqueeze(2).expand(-1, -1, t.size(2), -1)  # Add head dimension
-        sin_t = sin.unsqueeze(2).expand(-1, -1, t.size(2), -1)  # Add head dimension
-        
-        # Apply rotation using euler's formula
-        t_embed = (t_rot * cos_t) + (rotate_half(t_rot) * sin_t)
-        
-        if t_pass.shape[-1] != 0:
-            t.copy_(torch.cat((t_embed, t_pass), dim=-1))
-        else:
-            t.copy_(t_embed)
+    # Apply rotation
+    q_out = (q * cos) + (rotate_tokens(q) * sin)
+    k_out = (k * cos) + (rotate_tokens(k) * sin)
     
-    # Recombine into qkv
-    qkv = torch.stack((q, k, v), dim=2)
-    return qkv
+    # Stack back together with v (which remains unchanged)
+    return torch.stack((q_out, k_out, v), dim=2)
 
 
 # function overload
@@ -234,9 +215,13 @@ class LabelEmbedder(nn.Module):
 #################################################################################
 
 class DDiTBlockWithCrossAttention(nn.Module):
-    def __init__(self, dim, n_heads, cond_dim, mlp_ratio=4, dropout=0.1):
+    def __init__(self, dim, n_heads, cond_dim=768, mlp_ratio=4, dropout=0.1):
         super().__init__()
         self.n_heads = n_heads
+        self.head_dim = dim // n_heads
+        self.dim = dim
+        self.text_dim = cond_dim
+        assert dim % n_heads == 0, f"dim {dim} must be divisible by n_heads {n_heads}"
         
         # Self attention components
         self.norm1 = LayerNorm(dim)
@@ -247,8 +232,7 @@ class DDiTBlockWithCrossAttention(nn.Module):
         # Cross attention components
         self.norm_cross = LayerNorm(dim)
         self.cross_q = nn.Linear(dim, dim, bias=False)
-        self.cross_k = nn.Linear(dim, dim, bias=False)
-        self.cross_v = nn.Linear(dim, dim, bias=False)
+        self.cross_kv = nn.Linear(dim, 2 * dim, bias=False)
         self.cross_out = nn.Linear(dim, dim, bias=False)
         self.dropout_cross = nn.Dropout(dropout)
 
@@ -269,6 +253,17 @@ class DDiTBlockWithCrossAttention(nn.Module):
         return bias_dropout_add_scale_fused_train if self.training else bias_dropout_add_scale_fused_inference
 
     def forward(self, x, rotary_cos_sin, c, text_embeddings, text_attention_mask=None):
+        # # Add dimension checks
+        # print(f"Input shapes:")
+        # print(f"x: {x.shape}")
+        # print(f"text_embeddings: {text_embeddings.shape}")
+        
+        # if len(text_embeddings.shape) != 3 or text_embeddings.shape[-1] != self.text_dim:
+        #     raise ValueError(
+        #         f"Expected text_embeddings shape [batch, seq_len, {self.text_dim}], "
+        #         f"got {text_embeddings.shape}"
+        #     )
+
         batch_size, seq_len = x.shape[0], x.shape[1]
         bias_dropout_scale_fn = self._get_bias_dropout_scale()
 
@@ -283,7 +278,9 @@ class DDiTBlockWithCrossAttention(nn.Module):
         x = modulate_fused(self.norm1(x), shift_msa, scale_msa)
 
         qkv = self.attn_qkv(x)
-        qkv = rearrange(qkv, 'b s (three h d) -> b s three h d', three=3, h=self.n_heads)
+        qkv = rearrange(qkv, 'b s (three h d) -> b s three h d', 
+                        three=3, h=self.n_heads, 
+                        d=self.head_dim)
         
         with torch.cuda.amp.autocast(enabled=False):
             cos, sin = rotary_cos_sin
@@ -308,25 +305,35 @@ class DDiTBlockWithCrossAttention(nn.Module):
         x_skip = x
         x = modulate_fused(self.norm_cross(x), shift_cross, scale_cross)
         
-        # Compute Q, K, V for cross attention
-        q = self.cross_q(x)
-        k = self.cross_k(text_embeddings)
-        v = self.cross_v(text_embeddings)
+        # Add missing sequence dimension to text_embeddings if needed
+        if len(text_embeddings.shape) == 2:
+            text_embeddings = text_embeddings.unsqueeze(1)  # [batch, 1, dim]
+        
+        # Project query from model features
+        q = self.cross_q(x)  # [batch, seq_len, dim]
+        
+        # Project key and value from text embeddings (already in model dim)
+        kv = self.cross_kv(text_embeddings)  # [batch, text_seq_len, 2*dim]
+        
+        k, v = kv.chunk(2, dim=-1)  # Each is [batch, text_seq_len, dim]
         
         # Reshape for attention
         q = rearrange(q, 'b s (h d) -> b h s d', h=self.n_heads)
         k = rearrange(k, 'b s (h d) -> b h s d', h=self.n_heads)
         v = rearrange(v, 'b s (h d) -> b h s d', h=self.n_heads)
 
+        # Scale query for numerical stability
+        q = q * (self.head_dim ** -0.5)
+
         # Compute attention scores
-        attn = torch.matmul(q, k.transpose(-2, -1)) / math.sqrt(q.size(-1))
+        attn = torch.matmul(q, k.transpose(-2, -1))
         
-        # Apply attention mask if provided
-        if text_attention_mask is not None:
-            attn = attn.masked_fill(
-                ~text_attention_mask.unsqueeze(1).unsqueeze(2),
-                float('-inf')
-            )
+        # # Apply attention mask if provided
+        # if text_attention_mask is not None:
+        #     attn = attn.masked_fill(
+        #         ~text_attention_mask.unsqueeze(1).unsqueeze(2),
+        #         float('-inf')
+        #     )
         
         attn = F.softmax(attn, dim=-1)
         attn = self.dropout_cross(attn)

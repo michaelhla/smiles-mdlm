@@ -18,7 +18,7 @@ subs_masking: False
 seed: 1
 
 loader:
-  global_batch_size: 512
+  global_batch_size: 32
   eval_global_batch_size: ${.global_batch_size}
   # Note: batch_size and eval_batch_size are **per machine**
   batch_size: ${div_up:${.global_batch_size}, ${eval:${trainer.devices} * ${trainer.num_nodes}}}
