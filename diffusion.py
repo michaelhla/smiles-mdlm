@@ -416,10 +416,10 @@ class Diffusion(L.LightningModule):
     else:
       raise ValueError(f'Invalid prefix: {prefix}')
 
-    self.log_dict(metrics,
-                  on_step=False,
-                  on_epoch=True,
-                  sync_dist=True)
+    # self.log_dict(metrics,
+    #               on_step=False,
+    #               on_epoch=True,
+    #               sync_dist=True)
     return loss
 
   def on_train_epoch_start(self):
