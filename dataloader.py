@@ -163,47 +163,63 @@ class Text8Tokenizer(transformers.PreTrainedTokenizer):
 def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
     # Load the dataset
     dataset = load_dataset("liupf/chEBI-20-MM")
-    bert_model = transformers.AutoModel.from_pretrained('bert-base-uncased')
-
+    bert_model = transformers.AutoModel.from_pretrained('bert-base-uncased').cuda()
+    bert_model.eval()
+    
     smiles_tokenizer = SMILESTokenizer()
     
-    # Process data into required format
     def process_examples(examples):
-        # Tokenize SMILES with custom tokenizer
-        smiles_encodings = smiles_tokenizer(
-            examples['SMILES'],
-            padding='max_length',
-            truncation=True,
-            max_length=config.model.smiles_length,  # New config parameter needed
-            return_attention_mask=True
-        )
+        # Process SMILES sequences
+        smiles_tokens = []
+        attention_masks = []
+        for smiles in examples['SMILES']:
+            # Encode SMILES with padding and truncation
+            encoded = smiles_tokenizer.encode(
+                smiles, 
+                max_length=256
+            )
+            # Create attention mask (1 for real tokens, 0 for padding)
+            attention_mask = [1 if token != smiles_tokenizer.vocab['[PAD]'] else 0 
+                            for token in encoded]
+            
+            smiles_tokens.append(encoded)
+            attention_masks.append(attention_mask)
         
-        # Get BERT embeddings for descriptions
-        description_encodings = text_tokenizer(
+        # Process text descriptions using BERT tokenizer
+        description_encodings = text_tokenizer.batch_encode_plus(
             examples['description'],
             padding='max_length', 
             truncation=True,
-            max_length=config.model.text_length,  # New config parameter needed
-            return_attention_mask=True,
+            max_length= 512,
+            # return_attention_mask=True,
             return_tensors='pt'
         )
         
-        # Get BERT embeddings
+        # Move to GPU and get embeddings
         with torch.no_grad():
-            text_embeddings = bert_model(**description_encodings).last_hidden_state ## TODO add bert model from hf 
+            input_ids = description_encodings['input_ids'].cuda()
+            attention_mask = description_encodings['attention_mask'].cuda()
+            
+            outputs = bert_model(
+                input_ids=input_ids,
+                attention_mask=attention_mask
+            )
+            text_embeddings = outputs.last_hidden_state.cpu()
         
         return {
-            'input_ids': smiles_encodings['input_ids'],
-            'attention_mask': smiles_encodings['attention_mask'],
+            'input_ids': smiles_tokens,
+            'attention_mask': attention_masks,
             'text_embeddings': text_embeddings,
             'text_attention_mask': description_encodings['attention_mask']
         }
 
-    # Process and create dataset
+    # Process and create dataset with smaller batches
     processed_dataset = dataset[mode].map(
         process_examples,
         batched=True,
-        remove_columns=dataset[mode].column_names
+        batch_size=32,
+        remove_columns=dataset[mode].column_names,
+        num_proc=1
     )
     
     return processed_dataset.with_format('torch')
@@ -423,7 +439,7 @@ def get_dataset(
   elif dataset_name == 'chebi':
     dataset = get_chebi_dataset(
         cache_dir=cache_dir,
-        tokenizer=tokenizer,
+        text_tokenizer=tokenizer,
         mode=mode
     )
   else:

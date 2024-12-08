@@ -54,7 +54,7 @@ class SMILESTokenizer:
             self.vocab[atom_group] = len(self.vocab)
             self.idx2token[self.vocab[atom_group]] = atom_group
     
-    def tokenize(self, smiles: str, max_length: int = 128) -> List[str]:
+    def tokenize(self, smiles: str, max_length: int = 256) -> List[str]:
         """Tokenize SMILES string into list of tokens"""
         # Add SOS token
         tokens = ['[SOS]']
@@ -95,7 +95,7 @@ class SMILESTokenizer:
         
         return tokens[:max_length]
     
-    def encode(self, smiles: str, max_length: int = 128) -> List[int]:
+    def encode(self, smiles: str, max_length: int = 256) -> List[int]:
         """Convert SMILES string to token indices"""
         tokens = self.tokenize(smiles, max_length)
         return [self.vocab.get(token, self.vocab['[PAD]']) for token in tokens]
