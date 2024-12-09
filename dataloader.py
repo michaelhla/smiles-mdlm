@@ -159,7 +159,6 @@ class Text8Tokenizer(transformers.PreTrainedTokenizer):
   def get_vocab(self) -> typing.Dict[str, int]:
     return self._vocab_str_to_int
 
-
 def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
     """Get ChEBI dataset with BERT embeddings cached to disk.
     
@@ -184,8 +183,9 @@ def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
     dataset = load_dataset("liupf/chEBI-20-MM")
     bert_model = transformers.AutoModel.from_pretrained('bert-base-uncased').cuda()
     bert_model.eval()
-    
+
     smiles_tokenizer = SMILESTokenizer()
+    smiles_tokenizer.load_vocabulary('/root/smiles-mdlm/smiles_vocab.txt')
     
     def process_examples(examples):
         # Process SMILES sequences
@@ -193,12 +193,9 @@ def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
         attention_masks = []
         for smiles in examples['SMILES']:
             # Encode SMILES with padding and truncation
-            encoded = smiles_tokenizer.encode(
-                smiles, 
-                max_length=256
-            )
+            encoded = smiles_tokenizer.encode_one(smiles)
             # Create attention mask (1 for real tokens, 0 for padding)
-            attention_mask = [1 if token != smiles_tokenizer.vocab['[PAD]'] else 0 
+            attention_mask = [1 if token != smiles_tokenizer.pad_token_id else 0 
                             for token in encoded]
             
             smiles_tokens.append(encoded)

@@ -1,110 +1,186 @@
-import re
-from typing import List
+import regex
+import torch
+from typing import List, Union
+from collections import Counter
+import os
+from datasets import load_dataset
+
 
 class SMILESTokenizer:
-    def __init__(self):
-        # Define token types
-        self.atoms = {'B', 'C', 'N', 'O', 'P', 'S', 'F', 'Cl', 'Br', 'I', 'H'}
-        self.special_atoms = {'c', 'n', 'o', 's', 'p'}  # aromatic atoms
+    def __init__(self, max_len: int = 256, min_freq: int = 1):
+        self.max_len = max_len
+        self.min_freq = min_freq
         
-        # Define bond symbols
-        self.bonds = {'-', '=', '#', ':'}
+        # Regex pattern for tokenization
+        self.pattern = r"\[[^\]]+]|Br?|Cl?|N|O|S|P|F|I|b|c|n|o|s|p|=|#|-|\+|\\|\/|:|~|@|\?|>|\*|\$|\%[0-9]{2}|\d|\(|\)|\."
+        self.regex = regex.compile(self.pattern)
         
-        # Special tokens
+        # Special tokens with UNK token added
         self.special_tokens = {
-            '[SOS]': 0,  # Start of sequence
-            '[EOS]': 1,  # End of sequence
-            '[PAD]': 2,  # Padding token
-            '(': 3,      # Opening parenthesis
-            ')': 4,      # Closing parenthesis
-            '[': 5,      # Opening bracket
-            ']': 6,      # Closing bracket
+            '[PAD]': 0,
+            '[UNK]': 1,
+            '[SOS]': 2,
+            '[EOS]': 3,
         }
         
-        # Build vocabulary
-        self.vocab = {}
-        self.vocab.update(self.special_tokens)
-        current_idx = len(self.special_tokens)
-        self.vocab_size = len(self.special_tokens) + len(self.atoms) + len(self.special_atoms) + len(self.bonds)
+        # Initialize vocabulary with special tokens
+        self.token_to_id = None
+        self.id_to_token = None
+        self.vocab_size = None
+        self.is_trained = False
+        self.pad_token_id = 0
         
-        # Add atoms
-        for atom in self.atoms:
-            self.vocab[atom] = current_idx
-            current_idx += 1
+    def train(self, data_dir: str = None, smiles_list: List[str] = None):
+        """Train tokenizer on SMILES data to build vocabulary"""
+        assert data_dir is not None or smiles_list is not None, "Either data_dir or smiles_list must be provided"
         
-        # Add aromatic atoms
-        for atom in self.special_atoms:
-            self.vocab[atom] = current_idx
-            current_idx += 1
-            
-        # Add bonds
-        for bond in self.bonds:
-            self.vocab[bond] = current_idx
-            current_idx += 1
-            
-        # Create reverse vocabulary
-        self.idx2token = {v: k for k, v in self.vocab.items()}
-
+        # Collect all tokens and their frequencies
+        token_freq = Counter()
         
-    def _find_atom_groups(self, smiles: str) -> List[str]:
-        """Find all atom groups in brackets like [NH3+], [OH-], etc."""
-        return re.findall(r'\[[^\]]+\]', smiles)
+        if data_dir is not None:
+            # Read SMILES from files in directory
+            for filename in os.listdir(data_dir):
+                if filename.endswith('.txt'):
+                    with open(os.path.join(data_dir, filename), 'r') as f:
+                        for line in f:
+                            smiles = line.strip().split('\t')[1] if '\t' in line else line.strip()
+                            tokens = self.tokenize(smiles)
+                            token_freq.update(tokens)
+        
+        if smiles_list is not None:
+            # Process provided SMILES list
+            for smiles in smiles_list:
+                tokens = self.tokenize(smiles)
+                token_freq.update(tokens)
+        
+        # Initialize vocabulary with special tokens
+        self.token_to_id = self.special_tokens.copy()
+        current_id = len(self.special_tokens)
+        
+        # Add tokens that meet minimum frequency requirement
+        for token, freq in token_freq.items():
+            if freq >= self.min_freq and token not in self.token_to_id:
+                self.token_to_id[token] = current_id
+                current_id += 1
+        
+        # Create reverse mapping
+        self.id_to_token = {v: k for k, v in self.token_to_id.items()}
+        self.vocab_size = len(self.token_to_id)
+        self.is_trained = True
+        
+        return self
     
-    def _add_atom_group_to_vocab(self, atom_group: str):
-        """Add new atom group to vocabulary if not present"""
-        if atom_group not in self.vocab:
-            self.vocab[atom_group] = len(self.vocab)
-            self.idx2token[self.vocab[atom_group]] = atom_group
+    def save_vocabulary(self, save_path: str):
+        """Save vocabulary to file"""
+        assert self.is_trained, "Tokenizer must be trained before saving vocabulary"
+        with open(save_path, 'w') as f:
+            for token, idx in sorted(self.token_to_id.items(), key=lambda x: x[1]):
+                f.write(f"{token}\t{idx}\n")
     
-    def tokenize(self, smiles: str, max_length: int = 256) -> List[str]:
+    def load_vocabulary(self, load_path: str):
+        """Load vocabulary from file"""
+        self.token_to_id = {}
+        with open(load_path, 'r') as f:
+            for line in f:
+                token, idx = line.strip().split('\t')
+                self.token_to_id[token] = int(idx)
+        
+        self.id_to_token = {v: k for k, v in self.token_to_id.items()}
+        self.vocab_size = len(self.token_to_id)
+        self.is_trained = True
+        return self
+    
+    def tokenize(self, smiles: str) -> List[str]:
         """Tokenize SMILES string into list of tokens"""
-        # Add SOS token
-        tokens = ['[SOS]']
+        return self.regex.findall(smiles)
+    
+    def encode_one(self, smiles: str) -> List[int]:
+        """Encode single SMILES string to list of token IDs"""
+        assert self.is_trained, "Tokenizer must be trained before encoding"
         
-        # Find and temporarily replace atom groups
-        atom_groups = self._find_atom_groups(smiles)
-        placeholder_map = {}
-        for i, group in enumerate(atom_groups):
-            placeholder = f"PLACEHOLDER{i}"
-            placeholder_map[placeholder] = group
-            self._add_atom_group_to_vocab(group)
-            smiles = smiles.replace(group, placeholder)
+        tokens = self.tokenize(smiles)
         
-        # Tokenize the string
-        i = 0
-        while i < len(smiles):
-            # Check for two-character atoms
-            if i + 1 < len(smiles) and smiles[i:i+2] in self.atoms:
-                tokens.append(smiles[i:i+2])
-                i += 2
-            # Check for placeholders (atom groups)
-            elif any(smiles[i:].startswith(p) for p in placeholder_map):
-                matching_placeholder = next(p for p in placeholder_map if smiles[i:].startswith(p))
-                tokens.append(placeholder_map[matching_placeholder])
-                i += len(matching_placeholder)
-            # Single character tokens
+        # Convert tokens to IDs with SOS and EOS
+        ids = [self.special_tokens['[SOS]']]
+        for token in tokens:
+            # Use UNK token for unknown tokens
+            ids.append(self.token_to_id.get(token, self.special_tokens['[UNK]']))
+        ids.append(self.special_tokens['[EOS]'])
+        
+        # Pad or truncate to max_len
+        if len(ids) < self.max_len:
+            ids.extend([self.special_tokens['[PAD]']] * (self.max_len - len(ids)))
+        else:
+            ids = ids[:self.max_len-1] + [self.special_tokens['[EOS]']]
+        
+        return ids
+    
+    def __call__(self, smiles: Union[str, List[str]]) -> List[List[int]]:
+        """Encode one or more SMILES strings"""
+        if isinstance(smiles, str):
+            return self.encode_one(smiles)
+        
+        return [self.encode_one(s) for s in smiles]
+    
+    def decode_one(self, ids: List[int]) -> str:
+        """Decode single list of token IDs back to SMILES string"""
+        assert self.is_trained, "Tokenizer must be trained before decoding"
+        
+        tokens = []
+        for id in ids:
+            token = self.id_to_token[id]
+            if token in ['[PAD]', '[SOS]', '[EOS]']:
+                continue
+            if token == '[UNK]':
+                tokens.append('?')  # Replace UNK with ? in output
             else:
-                if smiles[i] in self.atoms or smiles[i] in self.special_atoms or \
-                   smiles[i] in self.bonds or smiles[i] in {'(', ')', '[', ']'}:
-                    tokens.append(smiles[i])
-                i += 1
-        
-        # Add EOS token
-        tokens.append('[EOS]')
-        
-        # Pad sequence
-        tokens.extend(['[PAD]'] * (max_length - len(tokens)))
-        
-        return tokens[:max_length]
+                tokens.append(token)
+        return ''.join(tokens)
     
-    def encode(self, smiles: str, max_length: int = 256) -> List[int]:
-        """Convert SMILES string to token indices"""
-        tokens = self.tokenize(smiles, max_length)
-        return [self.vocab.get(token, self.vocab['[PAD]']) for token in tokens]
+    def decode(self, ids_list: List[List[int]]) -> Union[str, List[str]]:
+        """Decode list(s) of token IDs back to SMILES string(s)"""
+        if isinstance(ids_list[0], int):
+            return self.decode_one(ids_list)
+        return [self.decode_one(ids) for ids in ids_list]
     
-    def decode(self, indices: List[int]) -> str:
-        """Convert token indices back to SMILES string"""
-        tokens = [self.idx2token[idx] for idx in indices if idx in self.idx2token]
-        # Remove special tokens and join
-        valid_tokens = [t for t in tokens if t not in {'[SOS]', '[EOS]', '[PAD]'}]
-        return ''.join(valid_tokens)
+    def __len__(self) -> int:
+        assert self.is_trained, "Tokenizer must be trained before getting length"
+        return self.vocab_size
+
+# Example usage
+if __name__ == "__main__":
+    # Load the ChEBI dataset
+    cache_dir = '/root/smiles-mdlm/cache/chebi'
+    mode = 'train'
+    dataset = load_dataset("liupf/chEBI-20-MM")
+
+    # Initialize the SMILES tokenizer
+    smiles_tokenizer = SMILESTokenizer(max_len=256, min_freq=1)
+
+    # Extract SMILES strings from the dataset
+    train_smiles = dataset[mode]['SMILES']
+
+    # Remove white space in the train_smiles
+    train_smiles = [smiles.replace(" ", "") for smiles in train_smiles]
+
+    # Train the tokenizer on the extracted SMILES strings
+    smiles_tokenizer.train(smiles_list=train_smiles)
+
+    # Save the trained vocabulary
+    smiles_tokenizer.save_vocabulary('/root/smiles-mdlm/smiles_vocab.txt')
+
+    # Test tokenization with unknown tokens
+    test_smiles = [
+        'C(C(=O)O)[NH3+]',  # Known SMILES
+        'C[Sc]C(=O)O',      # Contains unknown token [Sc]
+    ]
+
+    # Test encoding and decoding
+    for smiles in test_smiles:
+        print(f"\nOriginal: {smiles}")
+        tokens = smiles_tokenizer.tokenize(smiles)
+        print(f"Tokens: {tokens}")
+        encoded = smiles_tokenizer(smiles)
+        print('encoded:', encoded)
+        decoded = smiles_tokenizer.decode(encoded)
+        print(f"Decoded: {decoded}")

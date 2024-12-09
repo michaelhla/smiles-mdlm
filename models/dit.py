@@ -501,7 +501,6 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
         )
         
         self.scale_by_sigma = config.model.scale_by_sigma
-
     def forward(self, indices, sigma, text_embeddings=None, text_attention_mask=None):
         """
         Args:
@@ -548,5 +547,10 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
                     text_attention_mask
                 )
             x = self.output_layer(x, c)
-
+            print("Debug x after output layer:", x[0,0,:5])
+            if x.isnan().any():
+                print("NaN detected in x")
+                print("indices:", indices)
+                exit()
+        
         return x

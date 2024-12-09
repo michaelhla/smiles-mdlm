@@ -70,7 +70,9 @@ def _print_config(
 
 
 @L.pytorch.utilities.rank_zero_only
-def _print_batch(train_ds, valid_ds, tokenizer, smiles_tokenizer, k=64):
+def _print_batch(train_ds, valid_ds, tokenizer, k=64):
+  smiles_tokenizer = SMILESTokenizer()
+  smiles_tokenizer.load_vocabulary('/root/smiles-mdlm/smiles_vocab.txt')
   for dl_type, dl in [
     ('train', train_ds), ('valid', valid_ds)]:
     print(f'Printing {dl_type} dataloader batch.')
@@ -147,7 +149,7 @@ def _ppl_eval(config, logger, tokenizer):
   trainer.validate(model, valid_ds)
 
 
-def _train(config, logger, tokenizer, smiles_tokenizer):
+def _train(config, logger, tokenizer):
   logger.info('Starting Training.')
   wandb_logger = None
   if config.get('wandb', None) is not None:
@@ -171,7 +173,8 @@ def _train(config, logger, tokenizer, smiles_tokenizer):
 
   train_ds, valid_ds = dataloader.get_dataloaders(
     config, tokenizer)
-  _print_batch(train_ds, valid_ds, tokenizer, smiles_tokenizer)
+
+  _print_batch(train_ds, valid_ds, tokenizer)
 
   model = diffusion.Diffusion(
     config, tokenizer=valid_ds.tokenizer)
@@ -194,14 +197,14 @@ def main(config):
   
   logger = utils.get_logger(__name__)
   tokenizer = dataloader.get_tokenizer(config)
-  smiles_tokenizer = SMILESTokenizer()
+  # smiles_tokenizer = SMILESTokenizer()
 
   if config.mode == 'sample_eval':
     generate_samples(config, logger, tokenizer)
   elif config.mode == 'ppl_eval':
     _ppl_eval(config, logger, tokenizer)
   else:
-    _train(config, logger, tokenizer, smiles_tokenizer)
+    _train(config, logger, tokenizer)
 
 
 if __name__ == '__main__':

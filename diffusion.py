@@ -77,6 +77,7 @@ class Diffusion(L.LightningModule):
 
     # Initialize both tokenizers
     self.smiles_tokenizer = SMILESTokenizer()
+    self.smiles_tokenizer.load_vocabulary('/root/smiles-mdlm/smiles_vocab.txt')
     self.text_tokenizer = transformers.AutoTokenizer.from_pretrained('bert-base-uncased')
     self.bert_model = transformers.AutoModel.from_pretrained('bert-base-uncased')
     
@@ -428,10 +429,24 @@ class Diffusion(L.LightningModule):
 
   def training_step(self, batch, batch_idx):
     loss = self._compute_loss(batch, prefix='train')
-    self.log_dict(self.train_metrics, 
-                  on_step=True, 
-                  on_epoch=True, 
-                  prog_bar=True)
+    
+    # Create a metrics dictionary starting with training metrics
+    metrics_dict = {k: v for k, v in self.train_metrics.items()}
+    
+    # Add gradient norms every 100 steps
+    if self.global_step % 100 == 0:
+        for name, param in self.named_parameters():
+            if param.grad is not None:
+                metrics_dict[f'grad_norm/{name}'] = param.grad.norm()
+    
+    # Log everything at once
+    self.log_dict(
+        metrics_dict,
+        on_step=True,
+        on_epoch=True,
+        prog_bar=True
+    )
+    
     return loss
 
   def on_validation_epoch_start(self):
