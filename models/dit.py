@@ -510,6 +510,7 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             text_attention_mask: Attention mask for text [batch_size, text_seq_len]
         """
         # Input embeddings
+        print(self.vocab_embed.embedding[0])
         x = self.vocab_embed(indices)
         x = x + self.pos_embed[:, :x.size(1), :]
         
@@ -550,6 +551,8 @@ class DIT(nn.Module, huggingface_hub.PyTorchModelHubMixin):
             print("Debug x after output layer:", x[0,0,:5])
             if x.isnan().any():
                 print("NaN detected in x")
+                print("self.vocab_size:", self.vocab_size)
+                print('max index:', torch.max(indices))
                 print("indices:", indices)
                 exit()
         

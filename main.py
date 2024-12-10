@@ -78,11 +78,11 @@ def _print_batch(train_ds, valid_ds, tokenizer, k=64):
     print(f'Printing {dl_type} dataloader batch.')
     batch = next(iter(dl))
     print('Batch input_ids.shape', batch['input_ids'].shape)
-    first = batch['input_ids'][0, :k]
-    last = batch['input_ids'][0, -k:]
-    print(f'First {k} SMILES tokens:', smiles_tokenizer.decode(first))
+    first = batch['input_ids'][0, :k].tolist()
+    last = batch['input_ids'][0, -k:].tolist()
+    print(f'First {k} SMILES tokens:', smiles_tokenizer.decode([first]))
     print('ids:', first)
-    print(f'Last {k} SMILES tokens:', smiles_tokenizer.decode(last))
+    print(f'Last {k} SMILES tokens:', smiles_tokenizer.decode([last]))
     print('ids:', last)
     print('Text embeddings shape:', batch['text_embeddings'].shape)
 

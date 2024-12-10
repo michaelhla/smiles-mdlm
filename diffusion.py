@@ -96,7 +96,7 @@ class Diffusion(L.LightningModule):
         )
 
     self.tokenizer = tokenizer
-    self.vocab_size = self.tokenizer.vocab_size
+    # self.vocab_size = self.tokenizer.vocab_size
     self.sampler = self.config.sampling.predictor
     self.gen_ppl_eval_model_name_or_path = self.config.eval.\
       gen_ppl_eval_model_name_or_path
@@ -273,6 +273,8 @@ class Diffusion(L.LightningModule):
     self.trainer.fit_loop._combined_loader.flattened = updated_dls
 
   def optimizer_step(self, *args, **kwargs):
+    torch.nn.utils.clip_grad_norm_(self.backbone.parameters(), max_norm=1.0)
+    torch.nn.utils.clip_grad_norm_(self.noise.parameters(), max_norm=1.0)
     super().optimizer_step(*args, **kwargs)
     if self.ema:
       self.ema.update(itertools.chain(
@@ -342,6 +344,7 @@ class Diffusion(L.LightningModule):
       sigma = self._process_sigma(sigma)
       with torch.cuda.amp.autocast(dtype=torch.float32):
           # Pass text conditioning to backbone
+
           logits = self.backbone(
               x, 
               sigma,
