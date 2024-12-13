@@ -4,6 +4,7 @@ import os
 import typing
 from dataclasses import dataclass
 from smiles_tokenizer import SMILESTokenizer
+import wandb
 
 import hydra.utils
 import lightning as L
@@ -273,8 +274,8 @@ class Diffusion(L.LightningModule):
     self.trainer.fit_loop._combined_loader.flattened = updated_dls
 
   def optimizer_step(self, *args, **kwargs):
-    torch.nn.utils.clip_grad_norm_(self.backbone.parameters(), max_norm=1.0)
-    torch.nn.utils.clip_grad_norm_(self.noise.parameters(), max_norm=1.0)
+    # torch.nn.utils.clip_grad_norm_(self.backbone.parameters(), max_norm=1.0)
+    # torch.nn.utils.clip_grad_norm_(self.noise.parameters(), max_norm=1.0)
     super().optimizer_step(*args, **kwargs)
     if self.ema:
       self.ema.update(itertools.chain(
@@ -398,6 +399,7 @@ class Diffusion(L.LightningModule):
         attention_mask = None
         
     text_embeddings = batch.get('text_embeddings', None)
+    print("text_embeddings", text_embeddings)
     text_attention_mask = batch.get('text_attention_mask', None)
     
     losses = self._loss(
@@ -1052,6 +1054,7 @@ class Diffusion(L.LightningModule):
         reconstruction_loss = self._reconstruction_loss(x0)
       elif self.parameterization == 'subs':
         reconstruction_loss = 0
+      # print({"diffusion_loss": diffusion_loss.item(), "reconstruction_loss": reconstruction_loss.item()})
       return reconstruction_loss + diffusion_loss
     
     # SUBS parameterization, continuous time.
@@ -1068,12 +1071,17 @@ class Diffusion(L.LightningModule):
       dsigma / torch.expm1(sigma))[:, None]
 
   def _loss(self, x0, attention_mask, text_embeddings=None, text_attention_mask=None):
-    (input_tokens, output_tokens,
-     attention_mask) = self._maybe_sub_sample(
-       x0, attention_mask)
+    # print('initial attention_mask shape:', attention_mask.shape)
+    # (input_tokens, output_tokens,
+    #  attention_mask) = self._maybe_sub_sample(
+    #    x0, attention_mask)
+
+    input_tokens = x0
+    output_tokens = x0 ## since we are not AR and we are working in small lengths, we don't need to subsample or use output_tokens
+
 
     if self.parameterization == 'ar':
-        logprobs = self.backbone(input_tokens, None)
+        logprobs = self.backbone(input_tokens, text_embeddings=text_embeddings, text_attention_mask=text_attention_mask)
         loss = - logprobs.gather(
             -1, output_tokens[:, :, None])[:, :, 0]
     else:
@@ -1082,12 +1090,25 @@ class Diffusion(L.LightningModule):
             text_embeddings=text_embeddings,
             text_attention_mask=text_attention_mask
         )
-    
+
     nlls = loss * attention_mask
     count = attention_mask.sum()
 
     batch_nll = nlls.sum()
     token_nll = batch_nll / count
+
+    print("token_nll", token_nll)
+
+    # if torch.isnan(token_nll):
+    #     print(f"Loss is NaN")
+    #     print(f"Input x0: {x0}")
+    #     print(f"Input attention_mask: {attention_mask}")
+    #     print(f"Input text_embeddings: {text_embeddings}")
+    #     print(f"Input text_attention_mask: {text_attention_mask}")
+    #     print(f"Subsampled input_tokens: {input_tokens}")
+    #     print(f"Subsampled output_tokens: {output_tokens}")
+    #     print(f"Subsampled attention_mask: {attention_mask}")
+    #     print(f"Forward pass diffusion loss: {loss}")
 
     return Loss(loss=token_nll,
                 nlls=nlls,
