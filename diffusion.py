@@ -1,3 +1,4 @@
+
 import itertools
 import math
 import os
@@ -399,7 +400,6 @@ class Diffusion(L.LightningModule):
         attention_mask = None
         
     text_embeddings = batch.get('text_embeddings', None)
-    print("text_embeddings", text_embeddings)
     text_attention_mask = batch.get('text_attention_mask', None)
     
     losses = self._loss(
@@ -415,6 +415,7 @@ class Diffusion(L.LightningModule):
       metrics = self.train_metrics
     elif prefix == 'val':
       self.valid_metrics.update(losses.nlls, losses.token_mask)
+      # print('update val metrics', losses.nlls)
       metrics = self.valid_metrics
     elif prefix == 'test':
       self.test_metrics.update(losses.nlls, losses.token_mask)
@@ -422,10 +423,10 @@ class Diffusion(L.LightningModule):
     else:
       raise ValueError(f'Invalid prefix: {prefix}')
 
-    # self.log_dict(metrics,
-    #               on_step=False,
-    #               on_epoch=True,
-    #               sync_dist=True)
+    self.log_dict(metrics,
+                  on_step=False,
+                  on_epoch=True,
+                  sync_dist=True)
     return loss
 
   def on_train_epoch_start(self):
@@ -444,13 +445,11 @@ class Diffusion(L.LightningModule):
             if param.grad is not None:
                 metrics_dict[f'grad_norm/{name}'] = param.grad.norm()
     
-    # Log everything at once
-    self.log_dict(
-        metrics_dict,
-        on_step=True,
-        on_epoch=True,
-        prog_bar=True
-    )
+    self.log(name='trainer/loss',
+             value=loss.item(),
+             on_step=True,
+             on_epoch=False,
+             sync_dist=True)
     
     return loss
 
@@ -464,6 +463,10 @@ class Diffusion(L.LightningModule):
         self.noise.parameters()))
     self.backbone.eval()
     self.noise.eval()
+
+    # print('nlls', self.valid_metrics.nll)
+    # print('valid_metrics', self.valid_metrics)
+    
     assert self.valid_metrics.nll.mean_value == 0
     assert self.valid_metrics.nll.weight == 0
 
@@ -1096,8 +1099,15 @@ class Diffusion(L.LightningModule):
 
     batch_nll = nlls.sum()
     token_nll = batch_nll / count
-
-    print("token_nll", token_nll)
+    if token_nll > 10:
+        print(f"High loss detected: {token_nll}")
+        print(f"Input x0: {x0}")
+        print(f"Input attention_mask: {attention_mask}")
+        print(f"Input text_embeddings: {text_embeddings}")
+        print(f"Input text_attention_mask: {text_attention_mask}")
+        print(f"Forward pass diffusion loss: {loss}")
+        print("count", count)
+    # print("token_nll", token_nll)
 
     # if torch.isnan(token_nll):
     #     print(f"Loss is NaN")
