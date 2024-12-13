@@ -165,14 +165,13 @@ def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
     Args:
         cache_dir: str, path to cache directory
         text_tokenizer: tokenizer for text descriptions
-        mode: str, one of 'train', 'validation', 'test'
     
     Returns:
-        dataset: datasets.Dataset with processed data
+        train_dataset, val_dataset: Tuple of datasets.Dataset with processed data
     """
     cache_dir = f'/root/smiles-mdlm/cache/chebi'
     
-    # Check if processed dataset exists
+    # Check if processed datasets exist
     if utils.fsspec_exists(os.path.join(cache_dir, mode)):
         LOGGER.info(f'Loading processed ChEBI data from: {cache_dir}')
         return datasets.load_from_disk(os.path.join(cache_dir, mode))
@@ -237,12 +236,22 @@ def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
         }
  
 
-    # Process dataset split by split and save to disk
-    processed_dataset = dataset[mode].map(
+    # Process dataset based on mode and save to disk
+    if mode == 'train':
+        dataset_split = dataset['train']
+        print(f"Size of the train: {len(dataset_split)}")
+        
+    elif mode == 'validation':
+        dataset_split = dataset['validation']
+        print(f"Size of the validation: {len(dataset_split)}")
+    else:
+        raise ValueError(f"Unsupported mode: {mode}")
+
+    processed_dataset = dataset_split.map(
         process_examples,
         batched=True,
         batch_size=32,
-        remove_columns=dataset[mode].column_names,
+        remove_columns=dataset_split.column_names,
         num_proc=1
     )
     
@@ -404,7 +413,7 @@ def get_dataset(
         filename = f'{dataset_name}_{mode}_bs{block_size}_unwrapped.dat'
     _path = os.path.join(cache_dir, filename)
 
-    _path = '/root/smiles-mdlm/cache/chebi/train' ## hardcoding for testing
+    _path = f'/root/smiles-mdlm/cache/chebi/{mode}' ## hardcoding for testing
     
     if utils.fsspec_exists(_path):
         LOGGER.info(f'Loading data from: {_path}')
