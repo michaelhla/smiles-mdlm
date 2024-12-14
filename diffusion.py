@@ -1058,8 +1058,17 @@ class Diffusion(L.LightningModule):
       elif self.parameterization == 'subs':
         reconstruction_loss = 0
       # print({"diffusion_loss": diffusion_loss.item(), "reconstruction_loss": reconstruction_loss.item()})
+      if diffusion_loss.item() > 10:
+        print(f"Large loss detected: {diffusion_loss.item()}")
+      print("T>0", diffusion_loss.item())
       return reconstruction_loss + diffusion_loss
+
+    # Create a mask for every element of model_output that is around self.neg_infinity
+    neg_infinity_mask = torch.isclose(model_output, torch.tensor(self.neg_infinity, device=model_output.device), atol=1e3)
     
+    # Use the mask to create a masked model_output
+    model_output[neg_infinity_mask] = 0  # or any other value that makes sense for your application
+
     # SUBS parameterization, continuous time.
     log_p_theta = torch.gather(
       input=model_output,
@@ -1069,9 +1078,20 @@ class Diffusion(L.LightningModule):
     if self.change_of_variables or self.importance_sampling:
       return log_p_theta * torch.log1p(
         - torch.exp(- self.noise.sigma_min))
-    
+
+
+    large_log_p_theta_mask = torch.abs(log_p_theta) > 1000
+    if large_log_p_theta_mask.any():
+        large_log_p_theta = log_p_theta[large_log_p_theta_mask]
+        print(f"Large log_p_theta values detected: {large_log_p_theta}")
+        filtered_log_p_theta = log_p_theta[~large_log_p_theta_mask]
+        average_log_p_theta = filtered_log_p_theta.mean()
+        print(f"Average log_p_theta excluding large values: {average_log_p_theta}")
+
+
+    smoothing_factor = 1e-7
     return - log_p_theta * (
-      dsigma / torch.expm1(sigma))[:, None]
+      dsigma / (torch.expm1(sigma) + smoothing_factor))[:, None]
 
   def _loss(self, x0, attention_mask, text_embeddings=None, text_attention_mask=None):
     # print('initial attention_mask shape:', attention_mask.shape)
@@ -1094,19 +1114,22 @@ class Diffusion(L.LightningModule):
             text_attention_mask=text_attention_mask
         )
 
+    # print(loss.shape, attention_mask.shape)
+
     nlls = loss * attention_mask
     count = attention_mask.sum()
 
     batch_nll = nlls.sum()
     token_nll = batch_nll / count
     if token_nll > 10:
-        print(f"High loss detected: {token_nll}")
-        print(f"Input x0: {x0}")
-        print(f"Input attention_mask: {attention_mask}")
-        print(f"Input text_embeddings: {text_embeddings}")
-        print(f"Input text_attention_mask: {text_attention_mask}")
-        print(f"Forward pass diffusion loss: {loss}")
-        print("count", count)
+        # print("losses: ", loss)
+        print(f"High loss detected: {loss.max()}")
+        # top10_loss, top10_indices = torch.topk(loss.view(-1), 10)
+        # top10_indices = torch.unravel_index(top10_indices, loss.shape)
+        # print(f"Top 10 losses: {top10_loss}")
+        # print(f"Indices of top 10 losses: {top10_indices}")
+        # max_loss_index = torch.argmax(loss)
+        # print(f"Index of max loss: {torch.unravel_index(max_loss_index, loss.shape)}")
     # print("token_nll", token_nll)
 
     # if torch.isnan(token_nll):
