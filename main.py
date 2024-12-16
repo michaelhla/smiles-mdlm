@@ -87,7 +87,7 @@ def _print_batch(train_ds, valid_ds, tokenizer, k=64):
     print('Text embeddings shape:', batch['text_embeddings'].shape)
 
 ## TODO: add smiles_tokenizer to the function signature and add text guidance
-def generate_samples(config, logger, tokenizer, smiles_tokenizer):
+def generate_samples(config, logger, tokenizer, text_embeddings=None):
   logger.info('Generating samples.')
   model = _load_from_checkpoint(config=config,
                                 tokenizer=tokenizer)
@@ -111,13 +111,13 @@ def generate_samples(config, logger, tokenizer, smiles_tokenizer):
       # any text after the first EOS token.
     else:
       samples = model.restore_model_and_sample(
-        num_steps=config.sampling.steps)
-      text_samples = model.tokenizer.batch_decode(samples)
-      model.compute_generative_perplexity(text_samples)
-  print('Text samples:', text_samples)
-  if not config.sampling.semi_ar:
-    print('Generative perplexity:',
-          model.gen_ppl_metric.compute())
+        num_steps=config.sampling.steps, text_embeddings=text_embeddings)
+      text_samples = model.tokenizer.decode(samples)
+      # model.compute_generative_perplexity(text_samples)
+  # print('Text samples:', text_samples)
+  # if not config.sampling.semi_ar:
+    # print('Generative perplexity:',
+    #       model.gen_ppl_metric.compute())
   return text_samples
 
 def _ppl_eval(config, logger, tokenizer):

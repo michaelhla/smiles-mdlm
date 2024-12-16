@@ -122,12 +122,12 @@ class SMILESTokenizer:
         
         return [self.encode_one(s) for s in smiles]
     
-    def decode_one(self, ids: List[int]) -> str:
-        """Decode single list of token IDs back to SMILES string"""
+    def decode_one(self, ids: torch.Tensor) -> str:
+        """Decode single tensor of token IDs back to SMILES string"""
         assert self.is_trained, "Tokenizer must be trained before decoding"
         
         tokens = []
-        for id in ids:
+        for id in ids.tolist():
             token = self.id_to_token[id]
             if token in ['[PAD]', '[SOS]', '[EOS]']:
                 continue
@@ -137,11 +137,11 @@ class SMILESTokenizer:
                 tokens.append(token)
         return ''.join(tokens)
     
-    def decode(self, ids_list: List[List[int]]) -> Union[str, List[str]]:
-        """Decode list(s) of token IDs back to SMILES string(s)"""
-        if isinstance(ids_list[0], int):
-            return self.decode_one(ids_list)
-        return [self.decode_one(ids) for ids in ids_list]
+    def decode(self, ids_tensor: torch.Tensor) -> Union[str, List[str]]:
+        """Decode tensor(s) of token IDs back to SMILES string(s)"""
+        if ids_tensor.dim() == 1:
+            return self.decode_one(ids_tensor)
+        return [self.decode_one(ids) for ids in ids_tensor]
     
     def __len__(self) -> int:
         assert self.is_trained, "Tokenizer must be trained before getting length"

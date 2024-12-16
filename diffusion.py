@@ -88,14 +88,6 @@ class Diffusion(L.LightningModule):
         param.requires_grad = False
         
     self.vocab_size = self.smiles_tokenizer.vocab_size
-    
-    # Initialize DiT with text conditioning
-    if self.config.backbone == 'dit':
-        self.backbone = models.dit.DIT(
-            self.config, 
-            vocab_size=self.vocab_size,
-            text_embed_dim=768  # BERT hidden size
-        )
 
     self.tokenizer = tokenizer
     # self.vocab_size = self.tokenizer.vocab_size
@@ -110,7 +102,7 @@ class Diffusion(L.LightningModule):
       self.mask_index = self.vocab_size
       self.vocab_size += 1
     else:
-      self.mask_index = self.tokenizer.mask_token_id
+        self.mask_index = self.tokenizer.mask_token_id
     self.parameterization = self.config.parameterization
     if self.config.backbone == 'dit':
       self.backbone = models.dit.DIT(
@@ -732,48 +724,24 @@ class Diffusion(L.LightningModule):
     return x
 
   @torch.no_grad()
-  def _sample(self, num_steps=None, eps=1e-5, text_prompts=None):
+  def _sample(self, num_steps=None, eps=1e-5, text_embeddings=None):
     """Generate samples from the model with text conditioning.
     
     Args:
         num_steps: Number of diffusion steps
         eps: Small constant for numerical stability
-        text_prompts: List of text prompts for conditioning, one per sample
+        text_embeddings: List of text embeddings for conditioning, one per sample
     """
     batch_size_per_gpu = self.config.loader.eval_batch_size
     
     if self.parameterization == 'ar':
-        return self._ar_sampler(batch_size_per_gpu, text_prompts)
-        
-    # Process text prompts if provided
-    if text_prompts is not None:
-        # Ensure we have enough prompts
-        if len(text_prompts) < batch_size_per_gpu:
-            text_prompts = text_prompts * (batch_size_per_gpu // len(text_prompts) + 1)
-        text_prompts = text_prompts[:batch_size_per_gpu]
-        
-        # Get BERT embeddings
-        text_embeddings, text_attention_mask = self.bert_model(
-            text_prompts,
-            padding=True,
-            truncation=True,
-            return_tensors="pt"
-        ).values()
-        
-        # Move to device
-        text_embeddings = text_embeddings.to(self.device)
-        text_attention_mask = text_attention_mask.to(self.device)
-    else:
-        # Use dummy embeddings if no text provided
-        text_embeddings = torch.zeros(
-            (batch_size_per_gpu, 1, 768),  # BERT hidden size
-            device=self.device
-        )
-        text_attention_mask = torch.ones(
-            (batch_size_per_gpu, 1),
-            device=self.device,
-            dtype=torch.bool
-        )
+        return self._ar_sampler(batch_size_per_gpu, text_embeddings)
+  
+    text_attention_mask = torch.ones(
+        (batch_size_per_gpu, 1),
+        device=self.device,
+        dtype=torch.bool
+    )
 
     # Setup sampling
     if num_steps is None:
@@ -781,7 +749,7 @@ class Diffusion(L.LightningModule):
         
     x = self._sample_prior(
         batch_size_per_gpu,
-        self.config.model.length
+        self.config.model.smiles_length
     ).to(self.device)
     
     timesteps = torch.linspace(1, eps, num_steps + 1, device=self.device)
@@ -834,7 +802,7 @@ class Diffusion(L.LightningModule):
     
     return x
 
-  def restore_model_and_sample(self, num_steps, eps=1e-5):
+  def restore_model_and_sample(self, num_steps, eps=1e-5, text_embeddings=None):
     """Generate samples from the model."""
     # Lightning auto-casting is not working in this method for some reason
     if self.ema:
@@ -846,13 +814,13 @@ class Diffusion(L.LightningModule):
         self.noise.parameters()))
     self.backbone.eval()
     self.noise.eval()
-    samples = self._sample(num_steps=num_steps, eps=eps)
+    samples = self._sample(num_steps=num_steps, eps=eps, text_embeddings=text_embeddings)
     if self.ema:
       self.ema.restore(itertools.chain(
         self.backbone.parameters(),
         self.noise.parameters()))
-    self.backbone.train()
-    self.noise.train()
+    # self.backbone.train()
+    # self.noise.train()
     return samples
 
   def get_score(self, x, sigma, text_embeddings=None, text_attention_mask=None):

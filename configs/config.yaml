@@ -45,7 +45,7 @@ training:
   change_of_variables: False
 
 eval:
-  checkpoint_path: ''  # Used to evaluate a checkpoint after training.
+  checkpoint_path: 'best.ckpt'  # Used to evaluate a checkpoint after training.
   disable_ema: False
   compute_generative_perplexity: False
   perplexity_batch_size: 8
@@ -99,3 +99,16 @@ checkpointing:
   # Note: `checkpoints` path should correspond to `checkpoint_every_n_steps.dirpath`
   resume_from_ckpt: true
   resume_ckpt_path: ${.save_dir}/checkpoints/last.ckpt
+
+model:
+  _target_: models.dit.DIT
+  hidden_size: 512  # Increased from 256 for more capacity
+  n_heads: 8        # Increased from 6 for more parallel attention
+  n_blocks: 16      # Increased from 12 for deeper network
+  dropout: 0.2      # Keep dropout for regularization
+  cond_dim: 768    # Increased from 768 for richer conditioning
+  length: 256       # Keep SMILES sequence length
+  scale_by_sigma: True
+  text_conditioning: True
+  smiles_length: 256  # Adjust based on your SMILES lengths
+  text_length: 512    # Adjust based on your text lengths

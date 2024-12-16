@@ -174,6 +174,7 @@ class TimestepEmbedder(nn.Module):
     :return: an (N, D) Tensor of positional embeddings.
     """
     # https://github.com/openai/glide-text2im/blob/main/glide_text2im/nn.py
+
     half = dim // 2
     freqs = torch.exp(
       - math.log(max_period)

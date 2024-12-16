@@ -1,0 +1,1 @@
+wget -O best.ckpt https://huggingface.co/mhla/smiles-mdlm/resolve/main/best.ckpt
