@@ -30,3 +30,8 @@ seaborn==0.13.2
 
 # CUDA optimizations
 triton==2.2.0
+
+# eval suite
+rdkit==2024.03.5
+Levenshtein==0.22.0
+nltk==3.8.1

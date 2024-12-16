@@ -35,7 +35,7 @@ def get_text_embedding(text_prompt):
     return cls_embedding
 
 # Example usage
-text_prompt = "A molecule with a benzene ring and a hydroxyl group."
+text_prompt = "The molecule is an epoxy(hydroxy)icosatrienoate that is the conjugate base of 11 hydroxy-(14R,15S)-epoxy-(5Z,8Z,12E)-icosatrienoic acid, obtained by deprotonation of the carboxy group; major species at pH 7.3. It is a conjugate base of an 11 hydroxy-(14R,15S)-epoxy-(5Z,8Z,12E)-icosatrienoic acid."
 text_embedding = get_text_embedding(text_prompt)
 
 text_embeddings = torch.stack([text_embedding]).to('cuda')

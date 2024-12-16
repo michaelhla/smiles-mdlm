@@ -86,7 +86,6 @@ def _print_batch(train_ds, valid_ds, tokenizer, k=64):
     print('ids:', last)
     print('Text embeddings shape:', batch['text_embeddings'].shape)
 
-## TODO: add smiles_tokenizer to the function signature and add text guidance
 def generate_samples(config, logger, tokenizer, text_embeddings=None):
   logger.info('Generating samples.')
   model = _load_from_checkpoint(config=config,
