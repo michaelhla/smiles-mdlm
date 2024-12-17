@@ -28,7 +28,7 @@ loader:
 
 sampling:
   predictor: ddpm_cache  # analytic, ddpm, ddpm_cache
-  steps: 128
+  steps: 200
   noise_removal: True
   # TODO(yair): @subham, why aren't these params under `eval`?
   num_sample_batches: 1  # Total samples: `num_gpus` * `loader.eval_batch_size` * num_sample_batches
@@ -76,7 +76,7 @@ trainer:
   val_check_interval: 826
 
 wandb:
-  project: smiles-mdlm
+  project: smiles-mdlm-180
   notes: Mulan for text
   group: null
   job_type: null

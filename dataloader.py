@@ -194,7 +194,7 @@ def get_chebi_dataset(cache_dir, text_tokenizer, mode='train'):
             # Encode SMILES with padding and truncation
             encoded = smiles_tokenizer.encode_one(smiles)
             # Create attention mask (1 for real tokens, 0 for padding)
-            attention_mask = [0.5 if token == smiles_tokenizer.pad_token_id else 2 if token == smiles_tokenizer.eos_token_id else 1 
+            attention_mask = [0.01 if token == smiles_tokenizer.pad_token_id else 2 if token == smiles_tokenizer.eos_token_id else 1 
                             for token in encoded]
             
             smiles_tokens.append(encoded)

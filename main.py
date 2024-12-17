@@ -111,6 +111,9 @@ def generate_samples(config, logger, tokenizer, text_embeddings=None):
     else:
       samples = model.restore_model_and_sample(
         num_steps=config.sampling.steps, text_embeddings=text_embeddings)
+      print('untokenized samples:', samples)
+      print(samples.shape)
+      print(samples[0])
       text_samples = model.tokenizer.decode(samples)
       # model.compute_generative_perplexity(text_samples)
   # print('Text samples:', text_samples)
