@@ -29,6 +29,7 @@ class SMILESTokenizer:
         self.vocab_size = None
         self.is_trained = False
         self.pad_token_id = 0
+        self.eos_token_id = 3
         
     def train(self, data_dir: str = None, smiles_list: List[str] = None):
         """Train tokenizer on SMILES data to build vocabulary"""
@@ -122,12 +123,15 @@ class SMILESTokenizer:
         
         return [self.encode_one(s) for s in smiles]
     
-    def decode_one(self, ids: torch.Tensor) -> str:
-        """Decode single tensor of token IDs back to SMILES string"""
+    def decode_one(self, ids: Union[torch.Tensor, List[int]]) -> str:
+        """Decode single tensor or list of token IDs back to SMILES string"""
         assert self.is_trained, "Tokenizer must be trained before decoding"
         
+        if isinstance(ids, torch.Tensor):
+            ids = ids.tolist()
+        
         tokens = []
-        for id in ids.tolist():
+        for id in ids:
             token = self.id_to_token[id]
             if token in ['[PAD]', '[SOS]', '[EOS]']:
                 continue
@@ -137,11 +141,16 @@ class SMILESTokenizer:
                 tokens.append(token)
         return ''.join(tokens)
     
-    def decode(self, ids_tensor: torch.Tensor) -> Union[str, List[str]]:
-        """Decode tensor(s) of token IDs back to SMILES string(s)"""
-        if ids_tensor.dim() == 1:
-            return self.decode_one(ids_tensor)
-        return [self.decode_one(ids) for ids in ids_tensor]
+    def decode(self, ids: Union[torch.Tensor, List[List[int]]]) -> Union[str, List[str]]:
+        """Decode tensor(s) or list(s) of token IDs back to SMILES string(s)"""
+        if isinstance(ids, torch.Tensor):
+            if ids.dim() == 1:
+                return self.decode_one(ids)
+            return [self.decode_one(id_tensor) for id_tensor in ids]
+        
+        if isinstance(ids[0], int):
+            return self.decode_one(ids)
+        return [self.decode_one(id_list) for id_list in ids]
     
     def __len__(self) -> int:
         assert self.is_trained, "Tokenizer must be trained before getting length"
