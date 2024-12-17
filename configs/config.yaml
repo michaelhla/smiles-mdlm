@@ -76,7 +76,7 @@ trainer:
   val_check_interval: 826
 
 wandb:
-  project: text-diffusion
+  project: smiles-mdlm
   notes: Mulan for text
   group: null
   job_type: null
