@@ -35,3 +35,7 @@ triton==2.2.0
 rdkit==2024.03.5
 Levenshtein==0.22.0
 nltk==3.8.1
+
+# gui
+flask==2.3.3
+py3Dmol==1.1.0

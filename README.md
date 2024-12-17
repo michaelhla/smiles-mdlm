@@ -234,3 +234,6 @@ year={2024},
 url={https://openreview.net/forum?id=L4uaAR4ArM}
 }
 ```
+
+port forwarding for gui
+ssh -L 5000:localhost:5000 username@remote_server

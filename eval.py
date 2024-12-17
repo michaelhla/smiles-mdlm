@@ -64,16 +64,6 @@ for batch in tqdm(valid_set, desc="Evaluating"):
         text_embeddings_list = []
         target_smiles_list = []
 
-# Process any remaining samples if the dataset size is not a multiple of batch_size
-if text_embeddings_list:
-    text_embeddings = torch.stack(text_embeddings_list).to('cuda')
-    smiles_samples = generate_samples(config, logger, tokenizer, text_embeddings)
-
-    # Update metrics
-    for i, generated_smiles in enumerate(smiles_samples):
-        target_smiles = text_tokenizer.decode(target_smiles_list[i], skip_special_tokens=True)
-        metrics.update(generated_smiles, target_smiles)
-
 # Compute and print the final metrics
 final_metrics = metrics.compute()
 print("Evaluation Metrics:", final_metrics)
