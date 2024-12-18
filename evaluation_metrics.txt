@@ -1,0 +1,5 @@
+bleu: 0.6781332746031239
+exact_match: 0.0
+levenshtein: 259.4808859223301
+maccs_similarity: 0.0
+validity: 0.0

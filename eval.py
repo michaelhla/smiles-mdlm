@@ -57,13 +57,17 @@ for batch in tqdm(valid_set, desc="Evaluating"):
 
         # Update metrics
         for i, generated_smiles in enumerate(smiles_samples):
-            target_smiles = tokenizer.decode_one(target_smiles_list[i], skip_special_tokens=True)
+            target_smiles = tokenizer.decode_one(target_smiles_list[i])
             metrics.update(generated_smiles, target_smiles)
 
         # Reset lists for the next batch
         text_embeddings_list = []
         target_smiles_list = []
 
-# Compute and print the final metrics
+    
+
+# Compute and write the final metrics to an output file
 final_metrics = metrics.compute()
-print("Evaluation Metrics:", final_metrics)
+with open('/root/smiles-mdlm/evaluation_metrics.txt', 'w') as f:
+    for metric, value in final_metrics.items():
+        f.write(f"{metric}: {value}\n")
