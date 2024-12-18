@@ -12,7 +12,7 @@ config_path = 'configs/config.yaml'  # Path to your config file
 config = OmegaConf.load(config_path)
 
 # Update the config with the checkpoint path
-config.eval.checkpoint_path = '/root/smiles-mdlm/outputs/chebi/2024.12.16/215831/checkpoints/best.ckpt'  # Update with your checkpoint path
+config.eval.checkpoint_path = '/root/smiles-mdlm/outputs/chebi/2024.12.18/095508/checkpoints/best.ckpt'  # Update with your checkpoint path
 config.mode = 'sample_eval'  # Set mode to sample_eval
 
 config.noise = OmegaConf.load('configs/noise/loglinear.yaml')
@@ -48,4 +48,4 @@ smiles_samples = generate_samples(config, logger, tokenizer, text_embeddings)
 # for sample in smiles_samples:
 #     print(sample)   
 
-print(smiles_samples[0])
+print(smiles_samples[31])

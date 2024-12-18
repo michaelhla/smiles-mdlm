@@ -15,7 +15,7 @@ config_path = 'configs/config.yaml'  # Path to your config file
 config = OmegaConf.load(config_path)
 
 # Update the config with the checkpoint path
-config.eval.checkpoint_path = '/root/smiles-mdlm/outputs/chebi/2024.12.16/215831/checkpoints/best.ckpt'  # Update with your checkpoint path
+config.eval.checkpoint_path = '/root/smiles-mdlm/outputs/chebi/2024.12.18/095508/checkpoints/best.ckpt'  # Update with your checkpoint path
 config.mode = 'sample_eval'  # Set mode to sample_eval
 
 config.noise = OmegaConf.load('configs/noise/loglinear.yaml')
@@ -57,7 +57,7 @@ for batch in tqdm(valid_set, desc="Evaluating"):
 
         # Update metrics
         for i, generated_smiles in enumerate(smiles_samples):
-            target_smiles = text_tokenizer.decode(target_smiles_list[i], skip_special_tokens=True)
+            target_smiles = tokenizer.decode_one(target_smiles_list[i], skip_special_tokens=True)
             metrics.update(generated_smiles, target_smiles)
 
         # Reset lists for the next batch
