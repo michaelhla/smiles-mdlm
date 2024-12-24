@@ -76,7 +76,7 @@ trainer:
   val_check_interval: 826
 
 wandb:
-  project: smiles-mdlm-180
+  project: smiles-mdlm-valtuning
   notes: Mulan for text
   group: null
   job_type: null

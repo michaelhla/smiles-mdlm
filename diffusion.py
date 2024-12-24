@@ -1,4 +1,3 @@
-
 import itertools
 import math
 import os
@@ -20,6 +19,7 @@ import dataloader
 import models
 import noise_schedule
 import utils
+from valtuning import SMILESValidityLosses
 
 LOG2 = math.log(2)
 
@@ -274,6 +274,10 @@ class Diffusion(L.LightningModule):
       self.ema.update(itertools.chain(
         self.backbone.parameters(),
         self.noise.parameters()))
+    
+    # Check and log gradient norms
+    grad_norm = self.compute_gradient_norms()
+    wandb.log({'train/grad_norm': grad_norm})
 
   def _subs_parameterization(self, logits, xt):
     # log prob at the mask index = - infinity
@@ -1058,8 +1062,8 @@ class Diffusion(L.LightningModule):
 
 
     smoothing_factor = 1e-7
-    return - log_p_theta * (
-      dsigma / (torch.expm1(sigma) + smoothing_factor))[:, None]
+    return (- log_p_theta * (
+      dsigma / (torch.expm1(sigma) + smoothing_factor))[:, None], model_output)
 
   def _loss(self, x0, attention_mask, text_embeddings=None, text_attention_mask=None):
     # print('initial attention_mask shape:', attention_mask.shape)
@@ -1076,7 +1080,7 @@ class Diffusion(L.LightningModule):
         loss = - logprobs.gather(
             -1, output_tokens[:, :, None])[:, :, 0]
     else:
-        loss = self._forward_pass_diffusion(
+        loss, model_output = self._forward_pass_diffusion(
             input_tokens,
             text_embeddings=text_embeddings,
             text_attention_mask=text_attention_mask
@@ -1085,10 +1089,15 @@ class Diffusion(L.LightningModule):
     # print(loss.shape, attention_mask.shape)
 
     nlls = loss * attention_mask
-    count = attention_mask.sum()
+    count = (attention_mask != 0).sum()
+
+    valtuning_loss = SMILESValidityLosses()
+    total_val_loss, _ = valtuning_loss.combined_loss(model_output)
 
     batch_nll = nlls.sum()
     token_nll = batch_nll / count
+    total_loss = token_nll + total_val_loss
+
     if token_nll > 10:
         # print("losses: ", loss)
         print(f"High loss detected: {loss.max()}")
@@ -1111,7 +1120,7 @@ class Diffusion(L.LightningModule):
     #     print(f"Subsampled attention_mask: {attention_mask}")
     #     print(f"Forward pass diffusion loss: {loss}")
 
-    return Loss(loss=token_nll,
+    return Loss(loss=total_loss,
                 nlls=nlls,
                 token_mask=attention_mask)
 
@@ -1222,3 +1231,13 @@ class Diffusion(L.LightningModule):
     self.backbone.train()
     self.noise.train()
     return sampling_steps, samples, sequence_lengths
+
+  def compute_gradient_norms(self):
+    total_norm = 0.0
+    for param in self.backbone.parameters():
+        if param.grad is not None:
+            total_norm += param.grad.data.norm(2).item() ** 2
+    for param in self.noise.parameters():
+        if param.grad is not None:
+            total_norm += param.grad.data.norm(2).item() ** 2
+    return total_norm ** 0.5
