@@ -1,6 +1,6 @@
 # Masked Diffusion Language Modeling (MDLM) for Conditional Small Molecule Generation
 
-![MDLM Animation](./smiles-mdlm-animation.mp4)
+![MDLM Animation](smiles-mdlm-animation.mp4)
 *Animation showing the nonsequential text-to-molecule generation process using MDLM.*
 
 ## Introduction
@@ -15,7 +15,7 @@ Unlike traditional autoregressive (AR) models, diffusion methods allow nonsequen
 
 SMILES and other molecular representations are inherently discrete, making it intuitive to work in discrete spaces. MDLM applies iterative masking (noise) and unmasking (denoising) processes, effectively adapting diffusion methods to this discrete domain.
 
-![MDLM Diagram](../assets/smiles-mdlm/diagram.png)
+![MDLM Diagram](diagram.png)
 *Diagram illustrating MDLM noising and denoising process (Source: [Sahoo, 2024](https://s-sahoo.com/mdlm/)).*
 
 ## Modifications Implemented
@@ -52,4 +52,4 @@ Although MDLM achieved moderate BLEU scores, it significantly underperformed com
 
 ---
 
-Full writeup here: michaelhla.com/smiles-mdlm
+Full writeup here: (https://michaelhla.com/smiles-mdlm)
